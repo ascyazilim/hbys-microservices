@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL - Tüm servislerin ana veritabanı
+  postgres:
+    image: postgres:15
+    container_name: hbbys-postgres
+    environment:
+      POSTGRES_USER: hbbys_user
+      POSTGRES_PASSWORD: hbbys_password
+      POSTGRES_DB: hbbys_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - hbbys-network
+
+  # 2. RabbitMQ - Asenkron iletişim için
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: hbbys-rabbitmq
+    ports:
+      - "5672:5672"   # Mikroservislerin bağlanacağı port
+      - "15672:15672" # Yönetim arayüzü (Tarayıcıdan girilen) portu
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - hbbys-network
+
+  # 3. Redis - Cache ve Randevu sistemi için
+  redis:
+    image: redis:7
+    container_name: hbbys-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - hbbys-network
+
+  # 4. Keycloak - Kimlik doğrulama (Auth) için
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.2
+    container_name: hbbys-keycloak
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/hbbys_db
+      KC_DB_USERNAME: hbbys_user
+      KC_DB_PASSWORD: hbbys_password
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    command: start-dev
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - hbbys-network
+
+networks:
+  hbbys-network:
+    driver: bridge
+
+volumes:
+  postgres-data:

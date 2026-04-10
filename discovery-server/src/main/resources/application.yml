@@ -1,0 +1,15 @@
+server:
+  port: 8761 # Eureka'nın varsayılan standart portudur.
+
+spring:
+  application:
+    name: discovery-server
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    register-with-eureka: false # Kendisi bir sunucu olduğu için kendini kaydetmesine gerek yok.
+    fetch-registry: false       # Diğer servisleri bulmasına gerek yok, o zaten ana merkez.
+    service-url:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
