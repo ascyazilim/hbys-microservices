@@ -11,9 +11,14 @@ spring:
     password: hbbys_password
     driver-class-name: org.postgresql.Driver
 
+  # FLYWAY AYARLARI BURAYA EKLENDİ
+  flyway:
+    enabled: true
+    baseline-on-migrate: true # Mevcut bir veritabanımız olduğu için bu ayar çok kritik
+
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
