@@ -7,7 +7,7 @@ spring:
 
   # Veri Tabanı (PostgreSQL) Bağlantısı
   datasource:
-    url: jdbc:postgresql://localhost:5432/hbbys_db
+    url: jdbc:postgresql://localhost:5433/hbbys_db
     username: hbbys_user
     password: hbbys_password
     driver-class-name: org.postgresql.Driver
