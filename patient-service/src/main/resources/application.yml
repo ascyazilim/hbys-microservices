@@ -1,28 +1,33 @@
 server:
-  port: 8083 # Gateway 8082 idi, Patient Service 8083 olsun.
+  port: 8083 # Patient Service portu
 
 spring:
   application:
     name: patient-service
 
-  # Veri Tabanı (PostgreSQL) Bağlantısı
+  # Yeni Veritabanımız (patient_db)
   datasource:
-    url: jdbc:postgresql://localhost:5433/hbbys_db
+    url: jdbc:postgresql://localhost:5433/patient_db
     username: hbbys_user
     password: hbbys_password
     driver-class-name: org.postgresql.Driver
 
-  # JPA / Hibernate Ayarları
+  # FLYWAY AYARLARI EKLENDİ
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    # Artık veritabanımız tamamen ayrı olduğu için özel bir history tablosu ismi vermemize gerek yok, varsayılanı kullanacak.
+
+  # JPA / HIBERNATE AYARLARI (Kontrol Flyway'e geçti)
   jpa:
     hibernate:
-      ddl-auto: update # Biz Entity (sınıf) yazdığımızda, veri tabanında tabloyu otomatik oluşturur.
-    show-sql: true # Geliştirme aşamasında konsolda SQL sorgularını görmek iyi olur.
+      ddl-auto: validate # DİKKAT: update yerine validate yaptık!
+    show-sql: true
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
-  # Güvenlik (Keycloak)
   security:
     oauth2:
       resourceserver:
