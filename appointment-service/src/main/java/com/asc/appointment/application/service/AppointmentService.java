@@ -1,16 +1,19 @@
 package com.asc.appointment.application.service;
 
+import com.asc.appointment.application.dto.event.AppointmentCreatedEvent;
 import com.asc.appointment.application.dto.request.AppointmentCreateRequest;
 import com.asc.appointment.application.dto.response.AppointmentResponse;
 import com.asc.appointment.application.mapper.AppointmentMapper;
 import com.asc.appointment.client.DoctorServiceClient;
 import com.asc.appointment.client.PatientServiceClient;
+import com.asc.appointment.config.RabbitMQConfig;
 import com.asc.appointment.domain.entity.Appointment;
 import com.asc.appointment.domain.enums.AppointmentStatus;
 import com.asc.appointment.domain.repository.AppointmentRepository;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -27,6 +30,7 @@ public class AppointmentService {
     private final DoctorServiceClient doctorServiceClient;
     private final PatientServiceClient patientServiceClient;
     private final AppointmentMapper appointmentMapper; // MAPPER ENJEKTE EDİLDİ
+    private final RabbitTemplate rabbitTemplate;
 
     @Transactional
     public String createAppointment(AppointmentCreateRequest request) {
@@ -64,7 +68,21 @@ public class AppointmentService {
 
         log.info("Randevu başarıyla oluşturuldu! ID: {}", appointment.getId());
 
-        // TODO: RabbitMQ -> Randevu oluşturuldu olayı fırlatılacak!
+        // 5. YENİ: RABBITMQ'YA MESAJ FIRLATMA
+        AppointmentCreatedEvent event = new AppointmentCreatedEvent(
+                appointment.getId(),
+                appointment.getDoctorId(),
+                appointment.getPatientId(),
+                appointment.getAppointmentTime()
+        );
+
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE_APPOINTMENT,
+                RabbitMQConfig.ROUTING_KEY_APPOINTMENT_CREATED,
+                event
+        );
+        log.info("RabbitMQ'ya 'Randevu Oluşturuldu' olayı fırlatıldı!");
+
         return "Randevu başarıyla oluşturuldu!";
     }
 
