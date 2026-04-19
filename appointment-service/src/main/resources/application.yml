@@ -11,6 +11,17 @@ spring:
     password: hbbys_password
     driver-class-name: org.postgresql.Driver
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+    cache:
+      type: redis
+      redis:
+        # Önbellekteki veriler varsayılan olarak 10 dakika kalsın (milisaniye cinsinden)
+        time-to-live: 600000
+        cache-null-values: false
+
   flyway:
     enabled: true
     baseline-on-migrate: true

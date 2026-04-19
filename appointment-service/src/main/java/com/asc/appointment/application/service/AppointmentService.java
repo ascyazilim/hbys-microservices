@@ -14,6 +14,9 @@ import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -29,27 +32,22 @@ public class AppointmentService {
     private final AppointmentRepository appointmentRepository;
     private final DoctorServiceClient doctorServiceClient;
     private final PatientServiceClient patientServiceClient;
-    private final AppointmentMapper appointmentMapper; // MAPPER ENJEKTE EDİLDİ
+    private final AppointmentMapper appointmentMapper;
     private final RabbitTemplate rabbitTemplate;
+
+    // SPRING PROXY ÇÖZÜMÜ: Sınıfın kendi proxy'sini içeri alıyoruz (Redis için şart!)
+    @Autowired
+    @Lazy
+    private AppointmentService self;
 
     @Transactional
     public String createAppointment(AppointmentCreateRequest request) {
 
-        // 1. Hasta Kontrolü (Record olduğu için getter "patientId()" şeklinde kullanılır)
-        try {
-            log.info("Hasta bilgisi doğrulanıyor: {}", request.patientId());
-            patientServiceClient.getPatientById(request.patientId());
-        } catch (FeignException.NotFound e) {
-            throw new RuntimeException("Randevu alınamadı: Sistemde böyle bir hasta bulunamadı!");
-        }
+        // 1. Hasta Kontrolü (Proxy üzerinden çağırıyoruz ki Redis devreye girsin)
+        self.validatePatient(request.patientId());
 
-        // 2. Doktor Kontrolü
-        try {
-            log.info("Doktor bilgisi doğrulanıyor: {}", request.doctorId());
-            doctorServiceClient.getDoctorById(request.doctorId());
-        } catch (FeignException.NotFound e) {
-            throw new RuntimeException("Randevu alınamadı: Sistemde böyle bir doktor bulunamadı!");
-        }
+        // 2. Doktor Kontrolü (Proxy üzerinden çağırıyoruz)
+        self.validateDoctor(request.doctorId());
 
         // 3. Çakışma Kontrolü
         boolean isTimeSlotTaken = appointmentRepository.existsByDoctorIdAndAppointmentTimeAndStatusNot(
@@ -68,7 +66,7 @@ public class AppointmentService {
 
         log.info("Randevu başarıyla oluşturuldu! ID: {}", appointment.getId());
 
-        // 5. YENİ: RABBITMQ'YA MESAJ FIRLATMA
+        // 5. RABBITMQ'YA MESAJ FIRLATMA
         AppointmentCreatedEvent event = new AppointmentCreatedEvent(
                 appointment.getId(),
                 appointment.getDoctorId(),
@@ -86,7 +84,34 @@ public class AppointmentService {
         return "Randevu başarıyla oluşturuldu!";
     }
 
-    // MAPSTRUCT ILE OTOMATIK DÖNÜŞÜM YAPAN GET METODLARI
+    // --- REDIS CACHE METODLARI ---
+
+    // Eğer hasta Redis'te varsa bu metod HİÇ ÇALIŞMAZ, doğrudan 'true' döner.
+    // Yoksa çalışır, Feign'e gider, başarılıysa Redis'e 'true' yazar. (Hata fırlatırsa Redis'e KESİNLİKLE yazmaz)
+    @Cacheable(value = "patients", key = "#patientId")
+    public boolean validatePatient(Long patientId) {
+        try {
+            log.info("Hasta bilgisi doğrulanıyor (Cache Miss - Feign Çağrısı): {}", patientId);
+            patientServiceClient.getPatientById(patientId);
+            return true;
+        } catch (FeignException.NotFound e) {
+            throw new RuntimeException("Randevu alınamadı: Sistemde böyle bir hasta bulunamadı!");
+        }
+    }
+
+    @Cacheable(value = "doctors", key = "#doctorId")
+    public boolean validateDoctor(UUID doctorId) {
+        try {
+            log.info("Doktor bilgisi doğrulanıyor (Cache Miss - Feign Çağrısı): {}", doctorId);
+            doctorServiceClient.getDoctorById(doctorId);
+            return true;
+        } catch (FeignException.NotFound e) {
+            throw new RuntimeException("Randevu alınamadı: Sistemde böyle bir doktor bulunamadı!");
+        }
+    }
+
+    // --- GET VE CANCEL METODLARI (Aynı Kaldı) ---
+
     @Transactional(readOnly = true)
     public Page<AppointmentResponse> getAppointmentsByDoctor(UUID doctorId, Pageable pageable) {
         log.info("Doktor ID'ye göre randevular sayfalayarak getiriliyor: {}", doctorId);
@@ -118,7 +143,6 @@ public class AppointmentService {
         appointment.setStatus(AppointmentStatus.CANCELLED);
         appointmentRepository.save(appointment);
 
-        // TODO: RabbitMQ -> İptal olayı fırlatılacak!
         return "Randevu başarıyla iptal edildi!";
     }
 }
