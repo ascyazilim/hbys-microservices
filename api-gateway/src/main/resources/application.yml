@@ -1,5 +1,5 @@
 server:
-  port: 8082 # Portu değiştirdik!
+  port: 8082
 
 spring:
   application:
@@ -11,16 +11,29 @@ spring:
           enabled: true
           lower-case-service-id: true
       routes:
+        # 1. HASTA SERVİSİ
         - id: patient-service
           uri: lb://patient-service
           predicates:
             - Path=/api/patients/**
+
+        # 2. DOKTOR SERVİSİ (YENİ EKLENDİ)
+        - id: doctor-service
+          uri: lb://doctor-service
+          predicates:
+            - Path=/api/doctors/**
+
+        # 3. RANDEVU SERVİSİ (YENİ EKLENDİ)
+        - id: appointment-service
+          uri: lb://appointment-service
+          predicates:
+            - Path=/api/appointments/**
+
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:8080/realms/hbys-realm
-          # Gateway, token'ın doğru olup olmadığını bu adresten teyit edecek.
 
 eureka:
   instance:
@@ -28,4 +41,3 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
-

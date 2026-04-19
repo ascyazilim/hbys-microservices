@@ -36,51 +36,56 @@ public class AppointmentController {
     @PreAuthorize("hasAuthority('APPOINTMENT_READ')")
     public ResponseEntity<Page<AppointmentResponse>> getAppointmentsByDoctor(
             @PathVariable UUID doctorId,
-            @AuthenticationPrincipal Jwt jwt, // 1. SİHİR: İsteği atan kişinin Keycloak Biletini (Token) yakalıyoruz
+            @AuthenticationPrincipal Jwt jwt,
             @PageableDefault(size = 10, sort = "appointmentTime") Pageable pageable) {
 
-        // 2. Token'ın kime ait olduğunu (Keycloak 'sub' / User ID alanı) alıyoruz
         String loggedInUserId = jwt.getSubject();
 
-        // 3. İsteği atan kişi bir "Sekreter" mi diye yetkilerine bakıyoruz
-        // (Sekreterlerin başkasının randevusunu görme hakkı olmalı)
-        boolean isSecretary = jwt.getClaimAsStringList("realm_access").contains("APPOINTMENT_CREATE");
+        // 1. DÜZELTME: realm_access bir JSON Objesidir (Map), onu doğru şekilde açıyoruz
+        java.util.Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
+        boolean isSecretary = false;
 
-        // 4. GÜVENLİK DUVARI: Eğer sekreter DEĞİLSE ve URL'deki ID ile Token'daki ID EŞLEŞMİYORSA
+        if (realmAccess != null && realmAccess.containsKey("roles")) {
+            java.util.List<String> roles = (java.util.List<String>) realmAccess.get("roles");
+            // Rolleri büyük harfe çevirip arıyoruz (Keycloak'taki yazım farklarına takılmamak için)
+            isSecretary = roles.stream()
+                    .map(String::toUpperCase)
+                    .anyMatch(role -> role.equals("APPOINTMENT_CREATE") || role.equals("SECRETARY"));
+        }
+
+        // 2. GÜVENLİK DUVARI
         if (!isSecretary && !loggedInUserId.equals(doctorId.toString())) {
             throw new AccessDeniedException("Güvenlik İhlali: Sadece kendi randevularınızı görüntüleyebilirsiniz!");
         }
 
-        // Kontrollerden geçtiyse veriyi getir
         return ResponseEntity.ok(appointmentService.getAppointmentsByDoctor(doctorId, pageable));
     }
+
 
     @GetMapping("/patient/{patientId}")
     @PreAuthorize("hasAuthority('APPOINTMENT_READ')")
     public ResponseEntity<Page<AppointmentResponse>> getAppointmentsByPatient(
             @PathVariable Long patientId,
-            @AuthenticationPrincipal Jwt jwt, // 1. Bilet (Token) yakalanıyor
+            @AuthenticationPrincipal Jwt jwt,
             @PageableDefault(size = 10, sort = "appointmentTime") Pageable pageable) {
 
-        // 2. İsteği atan kişi yetkili bir personel mi? (Sekreter vb.)
-        // Eğer "APPOINTMENT_CREATE" yetkisi varsa tüm hastaları görebilir.
-        boolean isPrivilegedUser = jwt.getClaimAsStringList("realm_access") != null &&
-                jwt.getClaimAsStringList("realm_access").contains("APPOINTMENT_CREATE");
-
-        // 3. Hastanın kimlik doğrulaması (Long ID vs Keycloak UUID uyuşmazlığı çözümü)
-        // Eğer Keycloak tarafında "patient_id" diye özel bir claim (Custom Mapper) oluşturduysan:
-        // String tokenPatientId = jwt.getClaimAsString("patient_id");
-
-        // VEYA Keycloak'ta kullanıcı adı (preferred_username) olarak TC No tutuyorsan,
-        // TC No üzerinden karşılaştırma yapmak en sağlıklısıdır. Şimdilik ID üzerinden gidiyoruz:
         String loggedInUserId = jwt.getSubject();
 
-        // 4. GÜVENLİK DUVARI
-        if (!isPrivilegedUser && !loggedInUserId.equals(patientId.toString())) {
+        // Aynı düzeltmeyi hasta için de yapıyoruz
+        java.util.Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
+        boolean isSecretary = false;
+
+        if (realmAccess != null && realmAccess.containsKey("roles")) {
+            java.util.List<String> roles = (java.util.List<String>) realmAccess.get("roles");
+            isSecretary = roles.stream()
+                    .map(String::toUpperCase)
+                    .anyMatch(role -> role.equals("APPOINTMENT_CREATE") || role.equals("SECRETARY"));
+        }
+
+        if (!isSecretary && !loggedInUserId.equals(patientId.toString())) {
             throw new AccessDeniedException("Güvenlik İhlali: Sadece kendi randevularınızı görüntüleyebilirsiniz!");
         }
 
-        // Kontrollerden geçtiyse veriyi getir
         return ResponseEntity.ok(appointmentService.getAppointmentsByPatient(patientId, pageable));
     }
 
