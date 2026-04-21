@@ -47,6 +47,19 @@ spring:
         jwt:
           issuer-uri: http://localhost:8080/realms/hbys-realm
 
+resilience4j:
+  circuitbreaker:
+    instances:
+      doctorService:
+        slidingWindowSize: 5 # Son 5 isteğe bak
+        failureRateThreshold: 50 # %50'si (yani en az 3'ü) hatalıysa ŞALTERİ İNDİR (OPEN)
+        waitDurationInOpenState: 10000 # Şalter 10 saniye açık (OPEN) kalsın, kimseyi geçirme
+        permittedNumberOfCallsInHalfOpenState: 2 # 10 saniye sonra (HALF-OPEN) 2 isteğin geçmesine izin ver, düzelmiş mi bak
+      patientService:
+        slidingWindowSize: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        permittedNumberOfCallsInHalfOpenState: 2
 eureka:
   instance:
     prefer-ip-address: true

@@ -13,6 +13,7 @@ import com.asc.appointment.domain.repository.AppointmentRepository;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
@@ -84,22 +85,32 @@ public class AppointmentService {
         return "Randevu başarıyla oluşturuldu!";
     }
 
-    // --- REDIS CACHE METODLARI ---
+    // --- REDIS CACHE Ve CIRCUIT BREAKER METODLARI ---
 
     // Eğer hasta Redis'te varsa bu metod HİÇ ÇALIŞMAZ, doğrudan 'true' döner.
     // Yoksa çalışır, Feign'e gider, başarılıysa Redis'e 'true' yazar. (Hata fırlatırsa Redis'e KESİNLİKLE yazmaz)
     @Cacheable(value = "patients", key = "#patientId")
+    @CircuitBreaker(name = "patientService", fallbackMethod = "patientFallback")
     public boolean validatePatient(Long patientId) {
         try {
             log.info("Hasta bilgisi doğrulanıyor (Cache Miss - Feign Çağrısı): {}", patientId);
             patientServiceClient.getPatientById(patientId);
             return true;
         } catch (FeignException.NotFound e) {
+            // Eğer 404 dönerse bu bir çökme değil, "kayıt yok" demektir. Şalter atmaz.
             throw new RuntimeException("Randevu alınamadı: Sistemde böyle bir hasta bulunamadı!");
         }
     }
 
+    // B PLANI (FALLBACK): Eğer patient-service çökerse veya şalter atarsa bu metod çalışır!
+    // DİKKAT: Metod imzası ana metodla aynı olmalı ve sonuna Throwable eklenmelidir.
+    public boolean patientFallback(Long patientId, Throwable t) {
+        log.error("Patient Service şu an hizmet veremiyor! Hata: {}", t.getMessage());
+        throw new RuntimeException("Şu anda hasta doğrulama sistemi çökmüş durumda, lütfen daha sonra tekrar deneyin.");
+    }
+
     @Cacheable(value = "doctors", key = "#doctorId")
+    @CircuitBreaker(name = "doctorService", fallbackMethod = "doctorFallback")
     public boolean validateDoctor(UUID doctorId) {
         try {
             log.info("Doktor bilgisi doğrulanıyor (Cache Miss - Feign Çağrısı): {}", doctorId);
@@ -108,6 +119,12 @@ public class AppointmentService {
         } catch (FeignException.NotFound e) {
             throw new RuntimeException("Randevu alınamadı: Sistemde böyle bir doktor bulunamadı!");
         }
+    }
+
+    // B PLANI (FALLBACK): Eğer doctor-service çökerse çalışır!
+    public boolean doctorFallback(UUID doctorId, Throwable t) {
+        log.error("Doctor Service şu an hizmet veremiyor! Hata: {}", t.getMessage());
+        throw new RuntimeException("Şu anda doktor doğrulama sistemi çökmüş durumda, lütfen daha sonra tekrar deneyin.");
     }
 
     // --- GET VE CANCEL METODLARI (Aynı Kaldı) ---
