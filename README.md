@@ -61,3 +61,24 @@ Proje, görevlerin bağımsız modüllere ayrıldığı "Domain-Driven Design" (
 Proje dizinindeki `docker-compose.yml` dosyası, sistemin ihtiyaç duyduğu veritabanı, message broker, cache ve security servislerini barındırır.
 ```bash
 docker-compose up -d
+```
+*Bu komut PostgreSQL, Keycloak, RabbitMQ ve Redis container'larını ayağa kaldıracaktır.*
+
+### 2. Keycloak Yapılandırması
+* `http://localhost:8080` adresinden Keycloak paneline giriş yapın.
+* **`hbys-realm`** adında yeni bir realm oluşturun.
+* Bir client (örn: `hbys-client`) ve kullanıcılar oluşturup, `realm_roles` üzerinden gerekli yetkileri (`APPOINTMENT_CREATE`, `APPOINTMENT_READ` vb.) atayın.
+
+### 3. Mikroservisleri Çalıştırma
+Sırasıyla aşağıdaki servisleri çalıştırın:
+1. `discovery-server` (Eureka)
+2. `api-gateway`
+3. `patient-service`, `doctor-service`, `appointment-service` (Sırası fark etmez)
+
+### 4. API Testi
+İstekleri doğrudan mikroservislere değil, **API Gateway (`8082`)** üzerinden göndermelisiniz. 
+Öncelikle Keycloak'tan geçerli bir **Bearer Token** alınmalı ve isteklerin `Authorization` header'ına eklenmelidir.
+
+```http
+POST http://localhost:8082/api/appointments
+Authorization: Bearer <TOKEN>
