@@ -11,6 +11,13 @@ spring:
     password: hbbys_password
     driver-class-name: org.postgresql.Driver
 
+    hikari:
+      maximum-pool-size: 30       # Havuzdaki maksimum bağlantı sayısı (Eski hali 10'du. Artık 30 kişi aynı anda DB'ye yazabilir)
+      minimum-idle: 10            # Gece 03:00'te hiç trafik olmasa bile havuzda hazır bekleyen bağlantı sayısı (Hızlı tepki için)
+      connection-timeout: 20000   # Havuz (30) tamamen doluysa, 31. kişinin hata almadan önce kuyrukta bekleme süresi (20 saniye)
+      idle-timeout: 300000        # Boşta yatan bağlantıların uyutulma süresi (5 dakika - Kaynak tasarrufu sağlar)
+      max-lifetime: 900000        # Bir bağlantının maksimum yaşama süresi (15 dakika - Stale/Ölü bağlantı kopmalarını kesin olarak engeller)
+
   data:
     redis:
       host: localhost
