@@ -8,7 +8,10 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "appointments")
+@Table(name = "appointments", indexes = {
+        @Index(name = "idx_appointments_patient_id", columnList = "patient_id"),
+        @Index(name = "idx_appointments_doctor_time_status", columnList = "doctor_id, appointment_time, status")
+})
 @Getter
 @Setter
 @NoArgsConstructor
