@@ -12,6 +12,13 @@ spring:
     password: hbbys_password
     driver-class-name: org.postgresql.Driver
 
+    hikari:
+      maximum-pool-size: 50       # Yoğun sorgu trafiği için havuzu 50'ye çıkardık
+      minimum-idle: 10
+      connection-timeout: 20000   # 20 saniye bekleme süresi
+      idle-timeout: 300000
+      max-lifetime: 900000
+
   # FLYWAY AYARLARI EKLENDİ
   flyway:
     enabled: true

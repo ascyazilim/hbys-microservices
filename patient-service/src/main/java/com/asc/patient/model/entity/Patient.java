@@ -2,6 +2,8 @@ package com.asc.patient.model.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDate;
 
@@ -12,6 +14,8 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@SQLDelete(sql = "UPDATE patients SET is_deleted = true WHERE id = ?") // Silme komutunu güncellemeye çevirir
+@SQLRestriction("is_deleted = false") // Tüm SELECT sorgularına otomatik 'WHERE is_deleted = false' ekler
 public class Patient {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,6 +42,12 @@ public class Patient {
     // Kayıt oluşturulma zamanını tutmak iyi bir pratiktir
     @Column(name = "created_at")
     private LocalDate createdAt;
+
+    @Version // Optimistic Locking
+    private Long version;
+
+    @Column(name = "is_deleted")
+    private boolean isDeleted = false;
 
     @PrePersist
     public void prePersist() {

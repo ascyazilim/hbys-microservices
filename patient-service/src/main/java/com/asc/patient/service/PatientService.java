@@ -8,6 +8,9 @@ import com.asc.patient.model.mapper.PatientMapper;
 import com.asc.patient.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -28,11 +31,39 @@ public class PatientService {
     public PatientResponse createPatient(CreatePatientRequest request) {
         log.info("Yeni hasta kayıt işlemi başlatıldı. İstek gelen TC: {}", request.tcNo());
 
-        if (patientRepository.existsByTcNo(request.tcNo())) {
-            log.warn("Kayıt reddedildi! Bu TC Kimlik numarası sistemde zaten var: {}", request.tcNo());
-            throw new IllegalArgumentException("Bu TC Kimlik numarası ile sistemde zaten bir hasta kayıtlı: " + request.tcNo());
+        // 1. Veritabanında (silinmişler dahil) bu TC'ye sahip biri var mı bakıyoruz
+        var existingPatientOpt = patientRepository.findByTcNoIncludingDeleted(request.tcNo());
+
+        if (existingPatientOpt.isPresent()) {
+            Patient existingPatient = existingPatientOpt.get();
+
+            // 2. Eğer hasta zaten aktifse (silinmemişse) her zamanki hatayı fırlatıyoruz
+            if (!existingPatient.isDeleted()) {
+                log.warn("Kayıt reddedildi! Bu TC Kimlik numarası sistemde zaten var: {}", request.tcNo());
+                throw new IllegalArgumentException("Bu TC Kimlik numarası ile sistemde zaten bir hasta kayıtlı: " + request.tcNo());
+            }
+
+            // 3.  Hasta önceden silinmiş! Onu hayata döndürüyoruz (Reactivate)
+            log.info("Silinmiş hasta kaydı bulundu. Eski kayıt yeni bilgilerle güncellenip tekrar aktif ediliyor. TC: {}", request.tcNo());
+
+            // Eski (silinmiş) kaydın bilgilerini, yeni gelen kayıt formundaki bilgilerle güncelliyoruz
+            existingPatient.setFirstName(request.firstName());
+            existingPatient.setLastName(request.lastName());
+            existingPatient.setDateOfBirth(request.dateOfBirth());
+            existingPatient.setPhoneNumber(request.phoneNumber());
+            existingPatient.setGender(request.gender());
+
+            // Silinmiş işaretini kaldırıyoruz (Zombiyi insana çevirdik!)
+            existingPatient.setDeleted(false);
+
+            // Kaydediyoruz
+            Patient reactivatedPatient = patientRepository.save(existingPatient);
+
+            log.info("Hasta başarıyla yeniden aktif edildi. ID: {}", reactivatedPatient.getId());
+            return patientMapper.toResponse(reactivatedPatient);
         }
 
+        // 4. Veritabanında (silinmişler dahil) hiç yoksa, sıfırdan yaratıyoruz
         Patient patient = patientMapper.toEntity(request);
         Patient savedPatient = patientRepository.save(patient);
 
@@ -52,6 +83,7 @@ public class PatientService {
     }
 
     // 3. ID'YE GÖRE GETİR (READ BY ID)
+    @Cacheable(value = "patients", key = "#id")
     public PatientResponse getPatientById(Long id) {
         log.info("ID'si {} olan hasta aranıyor...", id);
 
@@ -66,6 +98,8 @@ public class PatientService {
     }
 
     // 4. TC KİMLİK NO'YA GÖRE GETİR (READ BY TC)
+
+    @Cacheable(value = "patients_tc", key = "#tcNo")
     public PatientResponse getPatientByTcNo(String tcNo) {
         log.info("TC Kimlik numarası {} olan hasta aranıyor...", tcNo);
 
@@ -80,6 +114,10 @@ public class PatientService {
     }
 
     // 5. GÜNCELLEME (UPDATE)
+    @Caching(evict = {
+            @CacheEvict(value = "patients", key = "#id"),
+            @CacheEvict(value = "patients_tc", allEntries = true) // TC değişme ihtimaline karşı tüm TC cache'ini temizleriz
+    })
     @Transactional
     public PatientResponse updatePatient(Long id, UpdatePatientRequest request) {
         log.info("{} ID'li hasta için güncelleme işlemi başlatıldı.", id);
@@ -98,6 +136,10 @@ public class PatientService {
     }
 
     // 6. SİLME (DELETE)
+    @Caching(evict = {
+            @CacheEvict(value = "patients", key = "#id"),
+            @CacheEvict(value = "patients_tc", allEntries = true)
+    })
     @Transactional
     public void deletePatient(Long id) {
         log.info("{} ID'li hastayı silme işlemi başlatıldı.", id);
