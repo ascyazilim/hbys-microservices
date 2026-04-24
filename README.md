@@ -1,84 +1,93 @@
 # 🏥 HBYS (Hastane Bilgi Yönetim Sistemi) - Mikroservis Mimarisi
 
-Bu proje, modern yazılım mimarisi prensipleri gözetilerek **Spring Boot** ve **Spring Cloud** ile geliştirilmiş, kapsamlı bir Hastane Bilgi Yönetim Sistemi (HBYS) arka uç (backend) projesidir. Sistem, yüksek ölçeklenebilirlik, asenkron iletişim, performans optimizasyonu ve üst düzey güvenlik standartları (OAuth2/OpenID Connect) hedeflenerek tamamen mikroservis mimarisi üzerine inşa edilmiştir.
+Bu proje, **Spring Boot 3.x**, **Spring Cloud** ve **Docker** ekosistemi kullanılarak geliştirilmiş, kurumsal standartlarda tasarlanmış bir backend projesidir.
 
-## 🚀 Kullanılan Teknolojiler ve Araçlar
-
-**Backend & Mimari:**
-* **Java 17 & Spring Boot 3.x**
-* **Spring Cloud** (Gateway, Netflix Eureka, OpenFeign)
-* **Veritabanı:** PostgreSQL
-* **Veritabanı Göçü:** Flyway
-* **DTO Mapping:** MapStruct & Java Records
-* **Asenkron İletişim:** RabbitMQ (Spring AMQP)
-* **Önbellekleme (Caching):** Redis (Cache-Aside Pattern)
-
-**Güvenlik:**
-* **Keycloak:** Identity and Access Management (IAM)
-* **Spring Security & OAuth2 Resource Server:** JWT Tabanlı Doğrulama
-* **PBAC/RBAC:** Yetki (Authority) tabanlı erişim kontrolü
-* **IDOR Koruması:** Kaynak seviyesinde (Resource-Level) erişim güvenliği
-
-**DevOps & Altyapı:**
-* **Docker & Docker Compose** (Altyapı servisleri için)
-* **Maven**
+Sistem; **yüksek erişilebilirlik (High Availability)**, **hata toleransı (Resilience)**, **güvenlik**, **servis izolasyonu** ve **konteynerizasyon** prensipleri dikkate alınarak modern mikroservis mimarisiyle geliştirilmiştir.
 
 ---
 
-## 🏗️ Sistem Mimarisi ve Servisler
+## 🏗️ Sistem Mimarisi
 
-Proje, görevlerin bağımsız modüllere ayrıldığı "Domain-Driven Design" (Etki Alanı Güdümlü Tasarım) yaklaşımına benzer bir yapıdadır.
+Proje, her mikroservisin kendi sorumluluk alanına ve kendi veritabanına sahip olduğu **Database-per-Service** yaklaşımını temel alır.
 
-| Servis Adı | Port | Görevi / Açıklaması |
-| :--- | :--- | :--- |
-| **API Gateway** | `8082` | Sistemin dış dünyaya açılan tek kapısı. Gelen JWT token'ları doğrular ve istekleri ilgili servislere yönlendirir (Routing & Load Balancing). |
-| **Discovery Server** | `8761` | Eureka Server. Tüm mikroservislerin kendini kaydettiği ve birbirini bulduğu santral. |
-| **Keycloak (Docker)** | `8080` | Kullanıcı doğrulama, yetkilendirme ve token (JWT) üretimi. |
-| **Appointment Service** | `8085` | Randevu oluşturma, iptal etme, çakışma (Double Booking) kontrolü. |
-| **Patient Service** | Dinamik | Hasta kayıtları ve yönetimi. |
-| **Doctor Service** | Dinamik | Doktor bilgileri ve uzmanlık alanları yönetimi. |
+Mikroservisler, izole bir Docker ağı içerisinde haberleşir. API istekleri dış dünyadan doğrudan servisler yerine **API Gateway** üzerinden sisteme giriş yapar.
 
----
+Genel mimari yapı:
 
-## ✨ Öne Çıkan Gelişmiş Özellikler
-
-### 🔐 Üst Düzey Güvenlik (Security First)
-* **Yetki Tabanlı Erişim (Authority-Based Access):** Klasik rol (`ROLE_ADMIN`) mantığı yerine, `APPOINTMENT_CREATE`, `PATIENT_READ` gibi ince ayarlı (fine-grained) yetkilendirme sistemi kurulmuştur.
-* **IDOR Koruması:** Kullanıcıların sadece kendilerine ait verilere ulaşabilmesi için, JWT içindeki `sub` (Keycloak User ID) claim'i ile URL'den gelen ID'ler çarpıştırılarak Güvensiz Doğrudan Nesne Başvurusu (IDOR) zafiyeti engellenmiştir.
-
-### ⚡ Performans ve Önbellekleme (Redis Cache)
-* Servisler arası iletişim ağ trafiğini azaltmak için **Redis** kullanılmıştır.
-* `appointment-service`, randevu oluştururken hasta ve doktor doğrulamasını **Cache-Aside** tasarım deseniyle yapar. Veri Redis'te varsa anında getirilir (Cache Hit), yoksa OpenFeign ile ilgili servise gidilir ve sonuç Redis'e yazılır. Spring Proxy mekanizması kullanılarak "Self-Invocation" sorunu çözülmüştür.
-
-### 🔄 Asenkron İletişim (RabbitMQ)
-* Randevu başarıyla oluşturulduğu an `appointment-service`, RabbitMQ kuyruğuna (`appointment.created.queue`) **AppointmentCreatedEvent** fırlatır. Bu sayede bildirim (SMS/Email) gibi uzun süren işlemler ana akışı yavaşlatmaz, asenkron olarak işlenir.
+- Merkezi yönlendirme için **API Gateway**
+- Servis keşfi için **Eureka Discovery Server**
+- Kimlik ve erişim yönetimi için **Keycloak**
+- Servisler arası senkron iletişim için REST tabanlı yapı
+- Asenkron bildirim süreçleri için **RabbitMQ**
+- Performans artırımı için **Redis Cache**
+- Hata toleransı için **Resilience4j Circuit Breaker**
+- Servis başına ayrı PostgreSQL veritabanı
 
 ---
 
-## 🛠️ Kurulum ve Çalıştırma
+## 🛰️ Servis Ekosistemi
 
-### 1. Altyapı Servislerini Ayağa Kaldırma
-Proje dizinindeki `docker-compose.yml` dosyası, sistemin ihtiyaç duyduğu veritabanı, message broker, cache ve security servislerini barındırır.
-```bash
-docker-compose up -d
-```
-*Bu komut PostgreSQL, Keycloak, RabbitMQ ve Redis container'larını ayağa kaldıracaktır.*
+| Servis Adı | Port | Açıklama |
+|---|---:|---|
+| **API Gateway** | `8082` | Merkezi giriş noktası, Swagger UI vitrini, güvenlik ve yönlendirme katmanı |
+| **Discovery Server** | `8761` | Eureka Server; mikroservislerin kayıt ve keşif merkezi |
+| **Keycloak** | `8080` | OIDC & OAuth2 tabanlı kimlik ve erişim yönetimi |
+| **Patient Service** | `8083` | Hasta yönetimi işlemleri. Özel veritabanı: `patient_db` |
+| **Doctor Service** | `8084` | Doktor yönetimi ve Redis cache işlemleri. Özel veritabanı: `hbbys_db` |
+| **Appointment Service** | `8085` | Randevu yönetimi, servisler arası iletişim ve Circuit Breaker kullanımı. Özel veritabanı: `appointment_db` |
+| **Notification Service** | Dinamik | RabbitMQ üzerinden asenkron SMS/e-posta bildirimlerini dinleyen servis |
 
-### 2. Keycloak Yapılandırması
-* `http://localhost:8080` adresinden Keycloak paneline giriş yapın.
-* **`hbys-realm`** adında yeni bir realm oluşturun.
-* Bir client (örn: `hbys-client`) ve kullanıcılar oluşturup, `realm_roles` üzerinden gerekli yetkileri (`APPOINTMENT_CREATE`, `APPOINTMENT_READ` vb.) atayın.
+---
 
-### 3. Mikroservisleri Çalıştırma
-Sırasıyla aşağıdaki servisleri çalıştırın:
-1. `discovery-server` (Eureka)
-2. `api-gateway`
-3. `patient-service`, `doctor-service`, `appointment-service` (Sırası fark etmez)
+## 🚀 Özellikler
 
-### 4. API Testi
-İstekleri doğrudan mikroservislere değil, **API Gateway (`8082`)** üzerinden göndermelisiniz. 
-Öncelikle Keycloak'tan geçerli bir **Bearer Token** alınmalı ve isteklerin `Authorization` header'ına eklenmelidir.
+### 🐋 Full Konteynerizasyon
 
-```http
-POST http://localhost:8082/api/appointments
-Authorization: Bearer <TOKEN>
+Proje, altyapı servislerinden uygulama servislerine kadar tamamen Dockerize edilmiştir.
+
+Docker Compose ile aşağıdaki bileşenler tek komutla ayağa kaldırılabilir:
+
+- PostgreSQL
+- Redis
+- RabbitMQ
+- Keycloak
+- Discovery Server
+- API Gateway
+- Patient Service
+- Doctor Service
+- Appointment Service
+- Notification Service
+
+Multi-stage Dockerfile yapısı sayesinde optimize edilmiş Docker imajları oluşturulur.
+
+---
+
+### 💾 Kalıcı Veri Yönetimi
+
+Veritabanı verilerinin konteyner silindiğinde kaybolmaması için **Docker Volume** kullanılmıştır.
+
+Bu sayede PostgreSQL konteyneri yeniden oluşturulsa bile veriler korunur.
+
+---
+
+### 🛡️ Resilience4j Circuit Breaker
+
+`appointment-service`, diğer mikroservislerle iletişim kurarken yaşanabilecek servis kesintileri, zaman aşımı veya ağ problemlerine karşı **Circuit Breaker** mekanizması ile korunur.
+
+Örneğin:
+
+- Hatalı istek oranı belirlenen eşiği aşarsa Circuit Breaker `OPEN` durumuna geçer.
+- Trafik geçici olarak kesilir.
+- Sistem gereksiz istek yükünden korunur.
+- Servisin tamamen çökmesi engellenir.
+
+Bu yapı özellikle randevu oluşturma gibi birden fazla servisle iletişim kurulan senaryolarda sistemin daha dayanıklı çalışmasını sağlar.
+
+---
+
+### 📖 Merkezi Swagger UI
+
+Tüm mikroservislerin API dokümantasyonuna API Gateway üzerinden tek bir noktadan erişilebilir.
+
+```text
+http://localhost:8082/swagger-ui.html
