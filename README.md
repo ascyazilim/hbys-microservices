@@ -91,3 +91,177 @@ Tüm mikroservislerin API dokümantasyonuna API Gateway üzerinden tek bir nokta
 
 ```text
 http://localhost:8082/swagger-ui.html
+```
+
+Bu yapı sayesinde her servisin Swagger dokümantasyonuna ayrı ayrı gitmeye gerek kalmadan, tüm API uçları merkezi olarak görüntülenebilir.
+
+---
+
+### 🔑 Güvenlik ve Yetkilendirme
+
+Projede kimlik doğrulama ve yetkilendirme işlemleri için **Keycloak** kullanılmıştır.
+
+Güvenlik tarafında kullanılan temel yaklaşımlar:
+
+- OAuth2 / OpenID Connect tabanlı kimlik doğrulama
+- JWT Access Token ile güvenli istek yönetimi
+- API Gateway seviyesinde token kontrolü
+- Resource Server seviyesinde servis bazlı yetkilendirme
+- Rol bazlı erişim kontrolü
+- Kullanıcının sadece kendi verisine erişmesini sağlayan resource-level güvenlik yaklaşımı
+
+---
+
+### 🧩 IDOR Koruması
+
+Projede sadece endpoint seviyesinde rol kontrolü yapılmaz. Aynı zamanda kullanıcının erişmeye çalıştığı kaynağın gerçekten o kullanıcıya ait olup olmadığı da kontrol edilir.
+
+Bu yaklaşım, **IDOR (Insecure Direct Object Reference)** zafiyetlerine karşı ek güvenlik sağlar.
+
+Örnek senaryo:
+
+```text
+Kullanıcı A, Kullanıcı B'ye ait hasta/randevu bilgisine erişmeye çalışırsa sistem bu isteği engeller.
+```
+
+Bu kontrol için JWT içerisindeki `sub` claim değeri kullanılarak kaynak sahibi doğrulanır.
+
+---
+
+## 🛠️ Kullanılan Teknolojiler
+
+| Kategori | Teknolojiler |
+|---|---|
+| Backend | Java 17, Spring Boot 3.x |
+| Mikroservis | Spring Cloud, Spring Cloud Gateway, Eureka Server |
+| Güvenlik | Spring Security, OAuth2 Resource Server, Keycloak, JWT |
+| Veritabanı | PostgreSQL |
+| Cache | Redis |
+| Message Broker | RabbitMQ |
+| Resilience | Resilience4j Circuit Breaker |
+| API Dokümantasyonu | Swagger / OpenAPI |
+| Container | Docker, Docker Compose |
+| Build Tool | Maven |
+
+---
+
+## 📁 Proje Yapısı
+
+Örnek proje yapısı aşağıdaki gibidir:
+
+```text
+hbys-microservices/
+│
+├── api-gateway/
+├── discovery-server/
+├── patient-service/
+├── doctor-service/
+├── appointment-service/
+├── notification-service/
+│
+├── docker-compose.yml
+└── README.md
+```
+
+---
+
+## ⚙️ Kurulum ve Çalıştırma
+
+### 1. Ön Gereksinimler
+
+Projeyi çalıştırmadan önce aşağıdaki araçların kurulu olması gerekir:
+
+- Java 17
+- Maven 3.8+
+- Docker
+- Docker Desktop
+
+---
+
+### 2. Projeyi Paketleme
+
+Projenin ana dizininde aşağıdaki komutu çalıştırın:
+
+```bash
+mvn clean package -DskipTests
+```
+
+Bu komut, mikroservislerin çalıştırılabilir `.jar` dosyalarını üretir.
+
+---
+
+### 3. Sistemi Docker Compose ile Başlatma
+
+Aşağıdaki komut ile tüm altyapı ve uygulama servisleri ayağa kaldırılır:
+
+```bash
+docker-compose up --build -d
+```
+
+Servislerin durumunu kontrol etmek için:
+
+```bash
+docker-compose ps
+```
+
+Logları görüntülemek için:
+
+```bash
+docker-compose logs -f
+```
+
+Belirli bir servisin loglarını görüntülemek için:
+
+```bash
+docker-compose logs -f appointment-service
+```
+
+---
+
+## 🗄️ Veritabanı Hazırlığı
+
+Proje, servis başına ayrı veritabanı yaklaşımı kullandığı için ilk çalıştırmada bazı veritabanlarının oluşturulması gerekebilir.
+
+PostgreSQL üzerinde aşağıdaki veritabanlarının mevcut olduğundan emin olun:
+
+```sql
+CREATE DATABASE patient_db;
+CREATE DATABASE appointment_db;
+```
+
+Doctor Service için kullanılan veritabanı:
+
+```sql
+CREATE DATABASE hbbys_db;
+```
+
+> Not: Veritabanları manuel olarak DBeaver, IntelliJ Database Tool veya SQL script aracılığıyla oluşturulabilir.
+
+---
+
+## 🌐 Önemli URL'ler
+
+| Bileşen | URL |
+|---|---|
+| API Gateway | `http://localhost:8082` |
+| Merkezi Swagger UI | `http://localhost:8082/swagger-ui.html` |
+| Eureka Dashboard | `http://localhost:8761` |
+| Keycloak Admin Panel | `http://localhost:8080` |
+| RabbitMQ Management UI | `http://localhost:15672` |
+
+---
+
+## 🔄 Örnek Sistem Akışı
+
+Randevu oluşturma senaryosunda sistem genel olarak aşağıdaki şekilde çalışır:
+
+1. Kullanıcı, API Gateway üzerinden randevu oluşturma isteği gönderir.
+2. API Gateway JWT token doğrulaması yapar.
+3. İstek `appointment-service` servisine yönlendirilir.
+4. `appointment-service`, hasta ve doktor bilgilerini ilgili servislerden kontrol eder.
+5. Servisler arası iletişim sırasında Circuit Breaker aktif olarak çalışır.
+6. Randevu başarıyla oluşturulur.
+7. RabbitMQ üzerinden bildirim mesajı yayınlanır.
+8. `notification-service`, mesajı dinleyerek SMS/e-posta bildirim sürecini başlatır.
+
+---
