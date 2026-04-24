@@ -21,7 +21,13 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable()) // Mikroservisler arası iletişimde CSRF kapatılır
                 .authorizeHttpRequests(auth -> auth
-                        .anyRequest().authenticated() // Tüm isteklere kapalı, Token zorunlu!
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/api/*/v3/api-docs/**", // Yeni hizaladığımız API yolları
+                                "/error"                 // HAYALET 401'İ ÖNLEYEN KOD!
+                        ).permitAll()
+                        .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(keycloakRoleConverter)) // Kendi yazığımız çeviriciyi kullan

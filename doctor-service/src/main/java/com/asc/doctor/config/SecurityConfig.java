@@ -22,11 +22,11 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // 1. ADIM: Swagger ve API Docs yollarını herkese açık (permitAll) yapıyoruz!
                         .requestMatchers(
-                                "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                "/api/*/v3/api-docs/**", // Yeni hizaladığımız API yolları
+                                "/error"                 // HAYALET 401'İ ÖNLEYEN KOD!
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

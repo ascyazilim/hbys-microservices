@@ -1,5 +1,6 @@
 server:
   port: 8085
+  forward-headers-strategy: framework  # BÜYÜK KURTARICI: Gateway'den gelen IP/Port bilgilerini kabul etmesini sağlar
 
 spring:
   application:
@@ -53,6 +54,10 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:8080/realms/hbys-realm
+
+springdoc:
+  api-docs:
+    path: /api/appointments/v3/api-docs
 
 resilience4j:
   circuitbreaker:

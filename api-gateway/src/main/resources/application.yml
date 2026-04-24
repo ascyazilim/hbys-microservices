@@ -17,13 +17,13 @@ spring:
           predicates:
             - Path=/api/patients/**
 
-        # 2. DOKTOR SERVİSİ (YENİ EKLENDİ)
+        # 2. DOKTOR SERVİSİ
         - id: doctor-service
           uri: lb://doctor-service
           predicates:
             - Path=/api/doctors/**
 
-        # 3. RANDEVU SERVİSİ (YENİ EKLENDİ)
+        # 3. RANDEVU SERVİSİ
         - id: appointment-service
           uri: lb://appointment-service
           predicates:
@@ -34,6 +34,17 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:8080/realms/hbys-realm
+
+# SWAGGER MERKEZİ VİTRİN AYARLARI
+springdoc:
+  swagger-ui:
+    urls:
+      - name: 1- Randevu Servisi
+        url: /api/appointments/v3/api-docs
+      - name: 2- Doktor Servisi
+        url: /api/doctors/v3/api-docs
+      - name: 3- Hasta Servisi
+        url: /api/patients/v3/api-docs
 
 eureka:
   instance:
