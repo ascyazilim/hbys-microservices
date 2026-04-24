@@ -3,6 +3,8 @@ package com.asc.doctor.domain.entity;
 import com.asc.doctor.domain.enums.DoctorStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -14,6 +16,8 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@SQLDelete(sql = "UPDATE doctors SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 public class Doctor {
 
     @Id
@@ -47,6 +51,10 @@ public class Doctor {
     // Eşzamanlılık (Concurrency) kontrolü için Optimistic Locking
     @Version
     private Long version;
+
+    // Soft Delete (Yumuşak Silme) için bayrak
+    @Column(name = "is_deleted")
+    private boolean isDeleted = false;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
