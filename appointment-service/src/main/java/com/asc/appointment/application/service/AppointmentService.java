@@ -89,7 +89,7 @@ public class AppointmentService {
 
     // Eğer hasta Redis'te varsa bu metod HİÇ ÇALIŞMAZ, doğrudan 'true' döner.
     // Yoksa çalışır, Feign'e gider, başarılıysa Redis'e 'true' yazar. (Hata fırlatırsa Redis'e KESİNLİKLE yazmaz)
-    @Cacheable(value = "patients", key = "#patientId")
+    @Cacheable(value = "appointment_patient_validation_v1", key = "#patientId")
     @CircuitBreaker(name = "patientService", fallbackMethod = "patientFallback")
     public boolean validatePatient(Long patientId) {
         try {
@@ -109,7 +109,7 @@ public class AppointmentService {
         throw new RuntimeException("Şu anda hasta doğrulama sistemi çökmüş durumda, lütfen daha sonra tekrar deneyin.");
     }
 
-    @Cacheable(value = "doctors", key = "#doctorId")
+    @Cacheable(value = "appointment_doctor_validation_v1", key = "#doctorId")
     @CircuitBreaker(name = "doctorService", fallbackMethod = "doctorFallback")
     public boolean validateDoctor(UUID doctorId) {
         try {

@@ -113,7 +113,8 @@ services:
       - SPRING_DATASOURCE_PASSWORD=hbbys_password
       - SPRING_DATA_REDIS_HOST=redis
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
-      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://host.docker.internal:8080/realms/hbys-realm
+      - APP_SECURITY_JWT_EXPECTED_ISSUER=http://localhost:8080/realms/hbys-realm
+      - APP_SECURITY_JWT_JWK_SET_URI=http://keycloak:8080/realms/hbys-realm/protocol/openid-connect/certs
     networks:
       - hbbys-network
 

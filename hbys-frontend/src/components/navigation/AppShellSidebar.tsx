@@ -48,7 +48,7 @@ const navigationItems = [
   {
     icon: AssessmentRounded,
     label: 'Doktor Yönetimi',
-    path: '/dashboard',
+    path: '/doctors',
     requiredAuthorities: ['DOCTOR_READ'],
   },
 ]

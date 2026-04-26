@@ -72,7 +72,7 @@ public class DoctorService {
     }
 
 
-    @Cacheable(value = "doctors", key = "#id")
+    @Cacheable(value = "doctors_v2", key = "#id")
     @Transactional(readOnly = true)
     public DoctorResponse getDoctorById(UUID id) {
         log.info("Doktor bilgisi veritabanından çekiliyor... ID: {}", id); //  sadece ilk istekte göreceksin!
@@ -82,7 +82,7 @@ public class DoctorService {
     }
 
 
-    @CacheEvict(value = "doctors", key = "#id")
+    @CacheEvict(value = "doctors_v2", key = "#id")
     @Transactional
     public DoctorResponse updateDoctor(UUID id, UpdateDoctorRequest request) {
         Doctor doctor = doctorRepository.findById(id)
@@ -99,7 +99,7 @@ public class DoctorService {
     }
 
     // SİLME: Doktor silinirse Redis'ten de uçuruyoruz
-    @CacheEvict(value = "doctors", key = "#id")
+    @CacheEvict(value = "doctors_v2", key = "#id")
     @Transactional
     public void deleteDoctor(UUID id) {
         if (!doctorRepository.existsById(id)) {

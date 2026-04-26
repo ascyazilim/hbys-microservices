@@ -16,7 +16,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@SQLDelete(sql = "UPDATE doctors SET is_deleted = true WHERE id = ?")
+@SQLDelete(sql = "UPDATE doctors SET is_deleted = true, version = version + 1 WHERE id = ? AND version = ?")
 @SQLRestriction("is_deleted = false")
 public class Doctor {
 
