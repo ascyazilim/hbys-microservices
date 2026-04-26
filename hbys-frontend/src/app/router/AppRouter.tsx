@@ -5,6 +5,8 @@ import { LoginPage } from '../../features/auth/pages/LoginPage.tsx'
 import { AuthCallbackPage } from '../../features/auth/pages/AuthCallbackPage.tsx'
 import { ProtectedRoute } from '../../features/auth/routes/ProtectedRoute.tsx'
 import { PublicOnlyRoute } from '../../features/auth/routes/PublicOnlyRoute.tsx'
+import { PatientDetailPage } from '../../features/patients/pages/PatientDetailPage.tsx'
+import { PatientManagementPage } from '../../features/patients/pages/PatientManagementPage.tsx'
 
 export function AppRouter() {
   return (
@@ -20,6 +22,8 @@ export function AppRouter() {
           <Route element={<AdminLayout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/patients" element={<PatientManagementPage />} />
+            <Route path="/patients/:id" element={<PatientDetailPage />} />
           </Route>
         </Route>
 

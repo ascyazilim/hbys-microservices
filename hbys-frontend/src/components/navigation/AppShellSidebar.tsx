@@ -35,19 +35,19 @@ const navigationItems = [
   { icon: DashboardRounded, label: 'Dashboard', path: '/dashboard' },
   {
     icon: PeopleAltRounded,
-    label: 'Hasta Yetkileri',
-    path: '/dashboard',
+    label: 'Hasta Yönetimi',
+    path: '/patients',
     requiredAuthorities: ['PATIENT_READ'],
   },
   {
     icon: CalendarMonthRounded,
-    label: 'Randevu Yetkileri',
+    label: 'Randevu Yönetimi',
     path: '/dashboard',
     requiredAuthorities: ['APPOINTMENT_READ'],
   },
   {
     icon: AssessmentRounded,
-    label: 'Doktor Yetkileri',
+    label: 'Doktor Yönetimi',
     path: '/dashboard',
     requiredAuthorities: ['DOCTOR_READ'],
   },

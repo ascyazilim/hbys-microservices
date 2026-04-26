@@ -11,31 +11,21 @@ spring:
           enabled: true
           lower-case-service-id: true
       routes:
-        # 1. HASTA SERVİSİ
         - id: patient-service
           uri: lb://patient-service
           predicates:
             - Path=/api/patients/**
 
-        # 2. DOKTOR SERVİSİ
         - id: doctor-service
           uri: lb://doctor-service
           predicates:
             - Path=/api/doctors/**
 
-        # 3. RANDEVU SERVİSİ
         - id: appointment-service
           uri: lb://appointment-service
           predicates:
             - Path=/api/appointments/**
 
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:8080/realms/hbys-realm
-
-# SWAGGER MERKEZİ VİTRİN AYARLARI
 springdoc:
   swagger-ui:
     urls:

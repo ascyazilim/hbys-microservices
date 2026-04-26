@@ -1,7 +1,18 @@
 package com.asc.patient.model.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
@@ -14,9 +25,10 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@SQLDelete(sql = "UPDATE patients SET is_deleted = true WHERE id = ?") // Silme komutunu güncellemeye çevirir
-@SQLRestriction("is_deleted = false") // Tüm SELECT sorgularına otomatik 'WHERE is_deleted = false' ekler
+@SQLDelete(sql = "UPDATE patients SET is_deleted = true WHERE id = ? AND version = ?")
+@SQLRestriction("is_deleted = false")
 public class Patient {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -37,13 +49,12 @@ public class Patient {
     private String phoneNumber;
 
     @Column(name = "gender", length = 10)
-    private String gender; // MALE, FEMALE
+    private String gender;
 
-    // Kayıt oluşturulma zamanını tutmak iyi bir pratiktir
     @Column(name = "created_at")
     private LocalDate createdAt;
 
-    @Version // Optimistic Locking
+    @Version
     private Long version;
 
     @Column(name = "is_deleted")

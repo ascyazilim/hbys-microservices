@@ -1,46 +1,35 @@
 server:
-  port: 8083 # Patient Service portu
-  forward-headers-strategy: framework  # BÜYÜK KURTARICI: Gateway'den gelen IP/Port bilgilerini kabul etmesini sağlar
+  port: 8083
+  forward-headers-strategy: framework
 
 spring:
   application:
     name: patient-service
 
-  # Yeni Veritabanımız (patient_db)
   datasource:
     url: jdbc:postgresql://localhost:5433/patient_db
     username: hbbys_user
     password: hbbys_password
     driver-class-name: org.postgresql.Driver
-
     hikari:
-      maximum-pool-size: 50       # Yoğun sorgu trafiği için havuzu 50'ye çıkardık
+      maximum-pool-size: 50
       minimum-idle: 10
-      connection-timeout: 20000   # 20 saniye bekleme süresi
+      connection-timeout: 20000
       idle-timeout: 300000
       max-lifetime: 900000
 
-  # FLYWAY AYARLARI EKLENDİ
   flyway:
     enabled: true
     baseline-on-migrate: true
-    # Artık veritabanımız tamamen ayrı olduğu için özel bir history tablosu ismi vermemize gerek yok, varsayılanı kullanacak.
 
-  # JPA / HIBERNATE AYARLARI (Kontrol Flyway'e geçti)
   jpa:
     hibernate:
-      ddl-auto: validate # DİKKAT: update yerine validate yaptık!
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
-
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:8080/realms/hbys-realm
 
 springdoc:
   api-docs:
