@@ -1,6 +1,7 @@
 package com.asc.doctor.application.dto.response;
 
 import com.asc.doctor.domain.enums.DoctorStatus;
+
 import java.util.UUID;
 
 public record DoctorResponse(
@@ -10,8 +11,11 @@ public record DoctorResponse(
         String lastName,
         String email,
         String phone,
+        Long specialtyId,
         String specialtyCode,
+        String specialtyName,
         Long clinicId,
+        String clinicName,
         DoctorStatus status
 ) {
 }

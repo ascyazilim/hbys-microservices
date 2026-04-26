@@ -2,10 +2,17 @@ package com.asc.doctor.application.service;
 
 import com.asc.doctor.application.dto.request.CreateDoctorRequest;
 import com.asc.doctor.application.dto.request.UpdateDoctorRequest;
+import com.asc.doctor.application.dto.response.ClinicResponse;
 import com.asc.doctor.application.dto.response.DoctorResponse;
-import com.asc.doctor.domain.entity.Doctor;
+import com.asc.doctor.application.dto.response.SpecialtyResponse;
 import com.asc.doctor.application.mapper.DoctorMapper;
+import com.asc.doctor.domain.entity.Clinic;
+import com.asc.doctor.domain.entity.Doctor;
+import com.asc.doctor.domain.entity.Specialty;
+import com.asc.doctor.domain.repository.ClinicRepository;
 import com.asc.doctor.domain.repository.DoctorRepository;
+import com.asc.doctor.domain.repository.SpecialtyRepository;
+import com.asc.doctor.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -15,6 +22,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Year;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,88 +33,155 @@ import java.util.UUID;
 public class DoctorService {
 
     private final DoctorRepository doctorRepository;
+    private final SpecialtyRepository specialtyRepository;
+    private final ClinicRepository clinicRepository;
     private final DoctorMapper doctorMapper;
 
     @Transactional
     public DoctorResponse createDoctor(CreateDoctorRequest request) {
-        log.info("Yeni doktor kayıt işlemi başlatıldı. Personel No: {}", request.personelNo());
+        Specialty specialty = getActiveSpecialty(request.specialtyId());
+        Clinic clinic = getActiveClinic(request.clinicId());
 
-        // 1. Zombi Kontrolü (Silinmişler dahil bu personel no var mı?)
-        Optional<Doctor> existingDoctorOpt = doctorRepository.findByPersonelNoIncludingDeleted(request.personelNo());
+        Optional<Doctor> deletedDoctorByEmail = findDeletedDoctorByEmail(request.email());
+        if (deletedDoctorByEmail.isPresent()) {
+            Doctor existingDoctor = deletedDoctorByEmail.get();
 
-        if (existingDoctorOpt.isPresent()) {
-            Doctor existingDoctor = existingDoctorOpt.get();
+            existingDoctor.setFirstName(request.firstName().trim());
+            existingDoctor.setLastName(request.lastName().trim());
+            existingDoctor.setEmail(normalizeNullable(request.email()));
+            existingDoctor.setPhone(normalizeNullable(request.phone()));
+            existingDoctor.setSpecialtyCode(specialty.getCode());
+            existingDoctor.setSpecialty(specialty);
+            existingDoctor.setClinic(clinic);
+            existingDoctor.setDeleted(false);
+            existingDoctor.activate();
 
-            if (!existingDoctor.isDeleted()) {
-                throw new IllegalArgumentException("Bu personel numarası zaten aktif kullanımda.");
-            }
-
-            // 2. Doktor hastaneye geri döndü (Reactivate)
-            log.info("Eski doktor kaydı bulundu. Bilgiler güncellenip tekrar aktif ediliyor. Personel No: {}", request.personelNo());
-
-            existingDoctor.setFirstName(request.firstName());
-            existingDoctor.setLastName(request.lastName());
-            existingDoctor.setEmail(request.email());
-            existingDoctor.setPhone(request.phone());
-            existingDoctor.setSpecialtyCode(request.specialtyCode());
-            existingDoctor.setClinicId(request.clinicId());
-            existingDoctor.setDeleted(false); // Hayata döndürdük
-            existingDoctor.activate(); // Domain metodunu çağırdık
-
+            log.info("Silinmis doktor kaydi yeniden aktif hale getirildi. Personel No: {}", existingDoctor.getPersonelNo());
             return doctorMapper.toResponse(doctorRepository.save(existingDoctor));
         }
 
-        if (request.email() != null && doctorRepository.existsByEmail(request.email())) {
-            throw new IllegalArgumentException("Bu e-posta adresi başka bir doktora ait.");
-        }
+        validateEmailAvailability(request.email(), null);
 
         Doctor doctor = doctorMapper.toEntity(request);
+        doctor.setPersonelNo(generatePersonnelNo());
+        doctor.setEmail(normalizeNullable(request.email()));
+        doctor.setPhone(normalizeNullable(request.phone()));
+        doctor.setSpecialtyCode(specialty.getCode());
+        doctor.setSpecialty(specialty);
+        doctor.setClinic(clinic);
+
         return doctorMapper.toResponse(doctorRepository.save(doctor));
     }
 
-
     @Transactional(readOnly = true)
     public Page<DoctorResponse> getDoctors(String search, Pageable pageable) {
-        log.info("Doktor listesi sorgulanıyor. Arama: {}, Sayfa: {}", search, pageable.getPageNumber());
+        log.info("Doktor listesi sorgulaniyor. Arama: {}, Sayfa: {}", search, pageable.getPageNumber());
         return doctorRepository.searchDoctors(search, pageable)
                 .map(doctorMapper::toResponse);
     }
 
-
     @Cacheable(value = "doctors_v2", key = "#id")
     @Transactional(readOnly = true)
     public DoctorResponse getDoctorById(UUID id) {
-        log.info("Doktor bilgisi veritabanından çekiliyor... ID: {}", id); //  sadece ilk istekte göreceksin!
+        log.info("Doktor bilgisi veritabanindan cekiliyor. ID: {}", id);
         return doctorRepository.findById(id)
                 .map(doctorMapper::toResponse)
-                .orElseThrow(() -> new RuntimeException("Doktor bulunamadı. ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Doktor bulunamadi. ID: " + id));
     }
-
 
     @CacheEvict(value = "doctors_v2", key = "#id")
     @Transactional
     public DoctorResponse updateDoctor(UUID id, UpdateDoctorRequest request) {
         Doctor doctor = doctorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Güncellenecek doktor bulunamadı."));
+                .orElseThrow(() -> new ResourceNotFoundException("Guncellenecek doktor bulunamadi."));
 
-        doctor.setFirstName(request.firstName());
-        doctor.setLastName(request.lastName());
-        doctor.setEmail(request.email());
-        doctor.setPhone(request.phone());
-        doctor.setSpecialtyCode(request.specialtyCode());
-        doctor.setClinicId(request.clinicId());
+        Specialty specialty = getActiveSpecialty(request.specialtyId());
+        Clinic clinic = getActiveClinic(request.clinicId());
+
+        validateEmailAvailability(request.email(), doctor.getId());
+
+        doctor.setFirstName(request.firstName().trim());
+        doctor.setLastName(request.lastName().trim());
+        doctor.setEmail(normalizeNullable(request.email()));
+        doctor.setPhone(normalizeNullable(request.phone()));
+        doctor.setSpecialtyCode(specialty.getCode());
+        doctor.setSpecialty(specialty);
+        doctor.setClinic(clinic);
 
         return doctorMapper.toResponse(doctorRepository.save(doctor));
     }
 
-    // SİLME: Doktor silinirse Redis'ten de uçuruyoruz
     @CacheEvict(value = "doctors_v2", key = "#id")
     @Transactional
     public void deleteDoctor(UUID id) {
         if (!doctorRepository.existsById(id)) {
-            throw new RuntimeException("Silinecek doktor bulunamadı.");
+            throw new ResourceNotFoundException("Silinecek doktor bulunamadi.");
         }
+
         doctorRepository.deleteById(id);
-        log.info("Doktor başarıyla silindi (Soft Delete). ID: {}", id);
+        log.info("Doktor basariyla silindi (soft delete). ID: {}", id);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SpecialtyResponse> getActiveSpecialties() {
+        // Not: Klinik ve uzmanlik verileri su an doctor-service icinde tutuluyor.
+        // Ileride reference-data-service veya hospital-structure-service gibi ayri bir servise tasinabilir.
+        return specialtyRepository.findAllByActiveTrueOrderByNameAsc().stream()
+                .map(specialty -> new SpecialtyResponse(specialty.getId(), specialty.getCode(), specialty.getName()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ClinicResponse> getActiveClinics() {
+        return clinicRepository.findAllByActiveTrueOrderByNameAsc().stream()
+                .map(clinic -> new ClinicResponse(clinic.getId(), clinic.getCode(), clinic.getName()))
+                .toList();
+    }
+
+    private Specialty getActiveSpecialty(Long specialtyId) {
+        return specialtyRepository.findByIdAndActiveTrue(specialtyId)
+                .orElseThrow(() -> new IllegalArgumentException("Secilen uzmanlik kaydi aktif degil veya bulunamadi."));
+    }
+
+    private Clinic getActiveClinic(Long clinicId) {
+        return clinicRepository.findByIdAndActiveTrue(clinicId)
+                .orElseThrow(() -> new IllegalArgumentException("Secilen klinik kaydi aktif degil veya bulunamadi."));
+    }
+
+    private Optional<Doctor> findDeletedDoctorByEmail(String email) {
+        String normalizedEmail = normalizeNullable(email);
+        if (normalizedEmail == null) {
+            return Optional.empty();
+        }
+
+        return doctorRepository.findByEmailIncludingDeleted(normalizedEmail)
+                .filter(Doctor::isDeleted);
+    }
+
+    private void validateEmailAvailability(String email, UUID currentDoctorId) {
+        String normalizedEmail = normalizeNullable(email);
+        if (normalizedEmail == null) {
+            return;
+        }
+
+        doctorRepository.findByEmailIncludingDeleted(normalizedEmail)
+                .filter(existingDoctor -> currentDoctorId == null || !existingDoctor.getId().equals(currentDoctorId))
+                .ifPresent(existingDoctor -> {
+                    throw new IllegalArgumentException("Bu e-posta adresi baska bir doktor kaydinda kullaniliyor.");
+                });
+    }
+
+    private String generatePersonnelNo() {
+        long sequenceValue = doctorRepository.getNextPersonnelSequence();
+        return "DR-%d-%04d".formatted(Year.now().getValue(), sequenceValue);
+    }
+
+    private String normalizeNullable(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

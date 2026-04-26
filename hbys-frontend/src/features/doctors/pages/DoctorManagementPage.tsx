@@ -37,6 +37,7 @@ import type {
   CreateDoctorRequest,
   Doctor,
   PageResponse,
+  ReferenceOption,
   UpdateDoctorRequest,
 } from '../types/doctor.types.ts'
 
@@ -60,13 +61,17 @@ export function DoctorManagementPage() {
   const canWrite = authorities.includes('DOCTOR_WRITE')
   const [doctorPage, setDoctorPage] = useState<PageResponse<Doctor>>(emptyPage)
   const [displayDoctors, setDisplayDoctors] = useState<Doctor[]>([])
+  const [specialties, setSpecialties] = useState<ReferenceOption[]>([])
+  const [clinics, setClinics] = useState<ReferenceOption[]>([])
   const [loading, setLoading] = useState(false)
+  const [referenceDataLoading, setReferenceDataLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [searchValue, setSearchValue] = useState('')
   const [searchActive, setSearchActive] = useState(false)
   const [error, setError] = useState<ApiErrorInfo | null>(null)
+  const [referenceDataError, setReferenceDataError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create')
@@ -77,6 +82,36 @@ export function DoctorManagementPage() {
   const totalDoctors = Number.isFinite(doctorPage.totalElements)
     ? doctorPage.totalElements
     : safeDoctorRows.length
+
+  useEffect(() => {
+    if (!canRead) {
+      return
+    }
+
+    const fetchReferences = async () => {
+      setReferenceDataLoading(true)
+      setReferenceDataError(null)
+
+      try {
+        const [specialtyResponse, clinicResponse] = await Promise.all([
+          doctorService.getSpecialties(),
+          doctorService.getClinics(),
+        ])
+        setSpecialties(specialtyResponse)
+        setClinics(clinicResponse)
+      } catch (requestError) {
+        setReferenceDataError(
+          `Uzmanlik ve klinik listeleri yuklenemedi. ${parseDoctorApiError(requestError).message}`,
+        )
+        setSpecialties([])
+        setClinics([])
+      } finally {
+        setReferenceDataLoading(false)
+      }
+    }
+
+    void fetchReferences()
+  }, [canRead])
 
   useEffect(() => {
     if (!canRead) {
@@ -243,15 +278,15 @@ export function DoctorManagementPage() {
       icon: BadgeRounded,
     },
     {
-      title: 'Uzmanlik Kodu Tanimli',
-      value: displayDoctors.filter((doctor) => doctor.specialtyCode).length.toString(),
-      caption: 'DoctorResponse icinde specialtyCode alani bulunan kayitlar',
+      title: 'Uzmanlik Tanimli',
+      value: displayDoctors.filter((doctor) => doctor.specialtyName).length.toString(),
+      caption: 'Doktorlar aktif uzmanlik referanslariyla iliskilidir',
       icon: LocalHospitalRounded,
     },
     {
-      title: 'Cache Destekli Detay',
-      value: 'Redis',
-      caption: 'Tekil doktor detayi backend tarafinda cache destekli sunulur',
+      title: 'Klinik Referansi',
+      value: clinics.length.toString(),
+      caption: 'Form dropdownlari doctor-service referans endpointlerinden beslenir',
       icon: ErrorOutlineRounded,
     },
   ]
@@ -316,8 +351,8 @@ export function DoctorManagementPage() {
               variant="body1"
               sx={{ mt: 1.5, maxWidth: 640, color: alpha('#ffffff', 0.82) }}
             >
-              Personel, iletisim ve uzmanlik bilgilerinin doktor mikroservisi uzerinden
-              yonetildigi kurumsal operasyon paneli.
+              Personel numarasinin backend tarafinda uretildigi, uzmanlik ve klinik bilgilerinin
+              referans veri endpointleriyle yonetildigi kurumsal operasyon paneli.
             </Typography>
           </Box>
 
@@ -400,9 +435,9 @@ export function DoctorManagementPage() {
               <Box>
                 <Typography variant="h5">Doktor Listesi</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-                  Backend aramasi isim ve soyisim icin `search` parametresini kullanir. Personel
-                  no, telefon, e-posta, uzmanlik kodu ve klinik ID gibi alanlar icin servis
-                  katmani mevcut liste endpointlerini tarayarak veritabanindaki kayitlari bulur.
+                  Form gonderimleri manuel personel no veya serbest uzmanlik metni yerine
+                  referans veri secimlerine dayanir. Liste ekraninda kullaniciya uzmanlik ve klinik
+                  isimleri gosterilir.
                 </Typography>
               </Box>
               {!canWrite ? (
@@ -414,6 +449,7 @@ export function DoctorManagementPage() {
             </Stack>
 
             {submitError ? <Alert severity="error">{submitError}</Alert> : null}
+            {referenceDataError ? <Alert severity="warning">{referenceDataError}</Alert> : null}
 
             <DoctorSearchBar
               value={searchValue}
@@ -445,7 +481,7 @@ export function DoctorManagementPage() {
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                   {searchActive
-                    ? 'Farkli bir ad, soyad, personel no, telefon veya uzmanlik kodu ile tekrar deneyin.'
+                    ? 'Farkli bir ad, soyad, personel no, uzmanlik veya klinik ile tekrar deneyin.'
                     : 'Ilk doktor kaydini olusturarak modulu kullanmaya baslayabilirsiniz.'}
                 </Typography>
               </Paper>
@@ -479,6 +515,10 @@ export function DoctorManagementPage() {
           open={dialogOpen}
           mode={dialogMode}
           doctor={selectedDoctor}
+          specialties={specialties}
+          clinics={clinics}
+          referenceDataLoading={referenceDataLoading}
+          referenceDataError={referenceDataError}
           loading={submitting}
           submitError={submitError}
           onClose={() => {

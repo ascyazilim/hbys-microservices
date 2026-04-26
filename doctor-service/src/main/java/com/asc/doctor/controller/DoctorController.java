@@ -2,7 +2,9 @@ package com.asc.doctor.controller;
 
 import com.asc.doctor.application.dto.request.CreateDoctorRequest;
 import com.asc.doctor.application.dto.request.UpdateDoctorRequest;
+import com.asc.doctor.application.dto.response.ClinicResponse;
 import com.asc.doctor.application.dto.response.DoctorResponse;
+import com.asc.doctor.application.dto.response.SpecialtyResponse;
 import com.asc.doctor.application.service.DoctorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -17,58 +19,73 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/doctors")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Doktor API", description = "Hastane doktorlarının kayıt, arama ve listeleme işlemleri")
+@Tag(name = "Doktor API", description = "Doktor kaydi, listeleme ve referans veri islemleri")
 public class DoctorController {
 
     private final DoctorService doctorService;
 
-    @Operation(summary = "Yeni Doktor Ekle", description = "Sisteme yeni bir doktor kaydı oluşturur.")
+    @Operation(summary = "Yeni Doktor Ekle")
     @PostMapping
     @PreAuthorize("hasAuthority('DOCTOR_WRITE')")
     public ResponseEntity<DoctorResponse> createDoctor(@Valid @RequestBody CreateDoctorRequest request) {
-        log.info("API İsteği Alındı: POST /api/doctors - Yeni doktor kaydı");
+        log.info("API istegi alindi: POST /api/doctors");
         return new ResponseEntity<>(doctorService.createDoctor(request), HttpStatus.CREATED);
     }
 
-    @Operation(summary = "ID ile Doktor Getir", description = "UUID değerine göre tek bir doktorun detaylarını getirir (Redis Cache destekli).")
+    @Operation(summary = "ID ile Doktor Getir")
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('DOCTOR_READ')")
     public ResponseEntity<DoctorResponse> getDoctorById(
-            @Parameter(description = "Doktorun benzersiz UUID'si") @PathVariable java.util.UUID id) {
-        log.info("API İsteği Alındı: GET /api/doctors/{} - Tekil doktor getir", id);
+            @Parameter(description = "Doktor UUID degeri") @PathVariable java.util.UUID id) {
+        log.info("API istegi alindi: GET /api/doctors/{}", id);
         return ResponseEntity.ok(doctorService.getDoctorById(id));
     }
 
-    @Operation(summary = "Doktorlarda Arama Yap", description = "İsim veya soyisime göre akıllı arama (Trigram) yapar. Parametre boşsa tümünü sayfalar.")
+    @Operation(summary = "Doktorlari Listele")
     @GetMapping
     @PreAuthorize("hasAuthority('DOCTOR_READ')")
     public ResponseEntity<Page<DoctorResponse>> getDoctors(
-            @Parameter(description = "Aranacak isim veya soyisim (Örn: Ahmet Yılmaz)") @RequestParam(required = false) String search,
+            @RequestParam(required = false) String search,
             @org.springframework.data.web.PageableDefault(size = 10, sort = "firstName") Pageable pageable) {
-
-        log.info("API İsteği Alındı: GET /api/doctors - Arama: '{}', Sayfa: {}", search, pageable.getPageNumber());
+        log.info("API istegi alindi: GET /api/doctors - Arama: '{}', Sayfa: {}", search, pageable.getPageNumber());
         return ResponseEntity.ok(doctorService.getDoctors(search, pageable));
     }
 
-    @Operation(summary = "Doktor Bilgilerini Güncelle", description = "Mevcut doktorun bilgilerini günceller ve eski önbelleği (Cache) temizler.")
+    @Operation(summary = "Aktif Uzmanliklari Getir")
+    @GetMapping("/specialties")
+    @PreAuthorize("hasAuthority('DOCTOR_READ')")
+    public ResponseEntity<List<SpecialtyResponse>> getActiveSpecialties() {
+        return ResponseEntity.ok(doctorService.getActiveSpecialties());
+    }
+
+    @Operation(summary = "Aktif Klinikleri Getir")
+    @GetMapping("/clinics")
+    @PreAuthorize("hasAuthority('DOCTOR_READ')")
+    public ResponseEntity<List<ClinicResponse>> getActiveClinics() {
+        return ResponseEntity.ok(doctorService.getActiveClinics());
+    }
+
+    @Operation(summary = "Doktor Bilgilerini Guncelle")
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('DOCTOR_WRITE')")
     public ResponseEntity<DoctorResponse> updateDoctor(
             @PathVariable java.util.UUID id,
             @Valid @RequestBody UpdateDoctorRequest request) {
-        log.info("API İsteği Alındı: PUT /api/doctors/{} - Doktor güncelle", id);
+        log.info("API istegi alindi: PUT /api/doctors/{}", id);
         return ResponseEntity.ok(doctorService.updateDoctor(id, request));
     }
 
-    @Operation(summary = "Doktoru Sil (Soft Delete)", description = "Doktoru pasif duruma çeker, geçmiş kayıtların bozulmasını engeller.")
+    @Operation(summary = "Doktoru Sil")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('DOCTOR_WRITE')")
     public ResponseEntity<Void> deleteDoctor(@PathVariable java.util.UUID id) {
-        log.info("API İsteği Alındı: DELETE /api/doctors/{} - Doktor sil", id);
+        log.info("API istegi alindi: DELETE /api/doctors/{}", id);
         doctorService.deleteDoctor(id);
         return ResponseEntity.noContent().build();
     }

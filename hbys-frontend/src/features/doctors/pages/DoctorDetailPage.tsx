@@ -29,6 +29,7 @@ import { DoctorFormDialog } from '../components/DoctorFormDialog.tsx'
 import type {
   ApiErrorInfo,
   Doctor,
+  ReferenceOption,
   UpdateDoctorRequest,
 } from '../types/doctor.types.ts'
 
@@ -47,9 +48,13 @@ export function DoctorDetailPage() {
   const canRead = authorities.includes('DOCTOR_READ')
   const canWrite = authorities.includes('DOCTOR_WRITE')
   const [doctor, setDoctor] = useState<Doctor | null>(null)
+  const [specialties, setSpecialties] = useState<ReferenceOption[]>([])
+  const [clinics, setClinics] = useState<ReferenceOption[]>([])
   const [loading, setLoading] = useState(false)
+  const [referenceDataLoading, setReferenceDataLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<ApiErrorInfo | null>(null)
+  const [referenceDataError, setReferenceDataError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -78,6 +83,36 @@ export function DoctorDetailPage() {
 
     void loadDoctor()
   }, [canRead, id, invalidDoctorId])
+
+  useEffect(() => {
+    if (!canWrite) {
+      return
+    }
+
+    const loadReferences = async () => {
+      setReferenceDataLoading(true)
+      setReferenceDataError(null)
+
+      try {
+        const [specialtyResponse, clinicResponse] = await Promise.all([
+          doctorService.getSpecialties(),
+          doctorService.getClinics(),
+        ])
+        setSpecialties(specialtyResponse)
+        setClinics(clinicResponse)
+      } catch (requestError) {
+        setReferenceDataError(
+          `Uzmanlik ve klinik listeleri yuklenemedi. ${parseDoctorApiError(requestError).message}`,
+        )
+        setSpecialties([])
+        setClinics([])
+      } finally {
+        setReferenceDataLoading(false)
+      }
+    }
+
+    void loadReferences()
+  }, [canWrite])
 
   const handleUpdate = async (values: UpdateDoctorRequest) => {
     if (!doctor) {
@@ -182,7 +217,8 @@ export function DoctorDetailPage() {
                 variant="body1"
                 sx={{ mt: 1, color: alpha('#ffffff', 0.82), maxWidth: 640 }}
               >
-                Kimlik, iletisim, uzmanlik ve durum alanlarini tek ekranda izleyin.
+                Personel numarasi, uzmanlik ve klinik baglantilariyla birlikte doktor kaydini tek
+                ekranda izleyin.
               </Typography>
             </div>
           </Stack>
@@ -219,6 +255,7 @@ export function DoctorDetailPage() {
 
       {loading ? <LinearProgress /> : null}
       {error ? <Alert severity="error">{error.message}</Alert> : null}
+      {referenceDataError && canWrite ? <Alert severity="warning">{referenceDataError}</Alert> : null}
 
       {!loading && !error && doctor ? (
         <>
@@ -228,9 +265,9 @@ export function DoctorDetailPage() {
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h5">Servis Davranisi ve Mimari Notlar</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Doctor-service detay endpointi Redis cache desteklidir. Liste endpointi ise
-                backend tarafinda `search` parametresi ile isim ve soyisim aramasi yapar.
-                Klinik veya takvim iliskileri icin bu response DTO disinda ek veri donulmez.
+                Doctor-service detay endpointi Redis cache desteklidir. Klinik ve uzmanlik
+                referanslari su an ayni mikroserviste tutulur; ileride hospital-structure veya
+                reference-data odakli ayri bir servise tasinabilir.
               </Typography>
             </CardContent>
           </Card>
@@ -243,6 +280,10 @@ export function DoctorDetailPage() {
           open={dialogOpen}
           mode="edit"
           doctor={doctor}
+          specialties={specialties}
+          clinics={clinics}
+          referenceDataLoading={referenceDataLoading}
+          referenceDataError={referenceDataError}
           loading={submitting}
           submitError={submitError}
           onClose={() => {

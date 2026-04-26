@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogTitle,
   Grid,
+  MenuItem,
   Stack,
   TextField,
   Typography,
@@ -15,16 +16,16 @@ import type { ChangeEvent } from 'react'
 import type {
   CreateDoctorRequest,
   Doctor,
+  ReferenceOption,
   UpdateDoctorRequest,
 } from '../types/doctor.types.ts'
 
 type DoctorFormValues = {
-  personelNo: string
   firstName: string
   lastName: string
   email: string
   phone: string
-  specialtyCode: string
+  specialtyId: string
   clinicId: string
 }
 
@@ -32,6 +33,10 @@ type DoctorFormDialogProps = {
   open: boolean
   mode: 'create' | 'edit'
   doctor?: Doctor | null
+  specialties: ReferenceOption[]
+  clinics: ReferenceOption[]
+  referenceDataLoading?: boolean
+  referenceDataError?: string | null
   loading?: boolean
   submitError?: string | null
   onClose: () => void
@@ -39,25 +44,23 @@ type DoctorFormDialogProps = {
 }
 
 const emptyValues: DoctorFormValues = {
-  personelNo: '',
   firstName: '',
   lastName: '',
   email: '',
   phone: '',
-  specialtyCode: '',
+  specialtyId: '',
   clinicId: '',
 }
 
 function buildInitialValues(mode: 'create' | 'edit', doctor?: Doctor | null): DoctorFormValues {
   if (mode === 'edit' && doctor) {
     return {
-      personelNo: doctor.personelNo,
       firstName: doctor.firstName,
       lastName: doctor.lastName,
       email: doctor.email ?? '',
       phone: doctor.phone ?? '',
-      specialtyCode: doctor.specialtyCode,
-      clinicId: doctor.clinicId === null ? '' : String(doctor.clinicId),
+      specialtyId: String(doctor.specialtyId),
+      clinicId: String(doctor.clinicId),
     }
   }
 
@@ -72,6 +75,10 @@ export function DoctorFormDialog({
   open,
   mode,
   doctor,
+  specialties,
+  clinics,
+  referenceDataLoading = false,
+  referenceDataError = null,
   loading = false,
   submitError,
   onClose,
@@ -87,8 +94,13 @@ export function DoctorFormDialog({
     }
 
   const handleSubmit = () => {
-    if (mode === 'create' && !values.personelNo.trim()) {
-      setValidationMessage('Personel numarasi zorunludur.')
+    if (referenceDataLoading) {
+      setValidationMessage('Referans veriler yuklenirken kayit gonderilemez.')
+      return
+    }
+
+    if (referenceDataError) {
+      setValidationMessage('Uzmanlik ve klinik verileri alinmadan kayit tamamlanamaz.')
       return
     }
 
@@ -102,45 +114,32 @@ export function DoctorFormDialog({
       return
     }
 
-    if (mode === 'create' && !values.specialtyCode.trim()) {
-      setValidationMessage('Uzmanlik kodu zorunludur.')
+    if (!values.specialtyId.trim()) {
+      setValidationMessage('Uzmanlik secimi zorunludur.')
       return
     }
 
-    if (mode === 'create' && !values.clinicId.trim()) {
-      setValidationMessage('Klinik ID zorunludur.')
-      return
-    }
-
-    if (values.clinicId.trim() && Number.isNaN(Number(values.clinicId))) {
-      setValidationMessage('Klinik ID sayisal bir deger olmali.')
+    if (!values.clinicId.trim()) {
+      setValidationMessage('Klinik secimi zorunludur.')
       return
     }
 
     setValidationMessage(null)
 
-    if (mode === 'create') {
-      onSubmit({
-        personelNo: values.personelNo,
-        firstName: values.firstName,
-        lastName: values.lastName,
-        email: values.email || null,
-        phone: values.phone || null,
-        specialtyCode: values.specialtyCode,
-        clinicId: Number(values.clinicId),
-      })
-      return
-    }
-
-    onSubmit({
+    const payload = {
       firstName: values.firstName,
       lastName: values.lastName,
       email: values.email || null,
       phone: values.phone || null,
-      specialtyCode: values.specialtyCode || null,
-      clinicId: values.clinicId.trim() ? Number(values.clinicId) : null,
-    })
+      specialtyId: Number(values.specialtyId),
+      clinicId: Number(values.clinicId),
+    }
+
+    onSubmit(payload)
   }
+
+  const personelNoValue =
+    mode === 'edit' && doctor ? doctor.personelNo : 'Sistem tarafindan otomatik olusturulacaktir'
 
   return (
     <Dialog open={open} onClose={loading ? undefined : onClose} fullWidth maxWidth="md">
@@ -150,9 +149,14 @@ export function DoctorFormDialog({
       <DialogContent dividers>
         <Stack spacing={3} sx={{ pt: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            Form alanlari doctor-service request DTO yapisina gore hazirlandi.
+            Personel numarasi backend tarafinda uretilir. Klinik ve uzmanlik alanlari sadece aktif
+            referans listelerinden secilebilir.
           </Typography>
 
+          {referenceDataLoading ? (
+            <Alert severity="info">Uzmanlik ve klinik listeleri yukleniyor.</Alert>
+          ) : null}
+          {referenceDataError ? <Alert severity="error">{referenceDataError}</Alert> : null}
           {(validationMessage || submitError) ? (
             <Alert severity="error">{validationMessage || submitError}</Alert>
           ) : null}
@@ -162,24 +166,31 @@ export function DoctorFormDialog({
               <TextField
                 fullWidth
                 label="Personel No"
-                value={values.personelNo}
-                disabled={mode === 'edit' || loading}
-                onChange={handleTextChange('personelNo')}
+                value={personelNoValue}
+                disabled
                 helperText={
-                  mode === 'edit'
-                    ? 'Update DTO icinde personelNo alani bulunmadigi icin degistirilemez.'
-                    : 'Doctor-service create DTO icin zorunludur.'
+                  mode === 'create'
+                    ? 'Kayit olusturuldugunda otomatik uretilir.'
+                    : 'Kurumsal personel numarasi sistem tarafinda yonetilir.'
                 }
               />
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
-                label="Uzmanlik Kodu"
-                value={values.specialtyCode}
-                disabled={loading}
-                onChange={handleTextChange('specialtyCode')}
-              />
+                select
+                label="Uzmanlik"
+                value={values.specialtyId}
+                disabled={loading || referenceDataLoading || Boolean(referenceDataError)}
+                onChange={handleTextChange('specialtyId')}
+              >
+                <MenuItem value="">Uzmanlik secin</MenuItem>
+                {specialties.map((specialty) => (
+                  <MenuItem key={specialty.id} value={String(specialty.id)}>
+                    {specialty.name} ({specialty.code})
+                  </MenuItem>
+                ))}
+              </TextField>
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField
@@ -221,11 +232,19 @@ export function DoctorFormDialog({
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
-                label="Klinik ID"
+                select
+                label="Klinik"
                 value={values.clinicId}
-                disabled={loading}
+                disabled={loading || referenceDataLoading || Boolean(referenceDataError)}
                 onChange={handleTextChange('clinicId')}
-              />
+              >
+                <MenuItem value="">Klinik secin</MenuItem>
+                {clinics.map((clinic) => (
+                  <MenuItem key={clinic.id} value={String(clinic.id)}>
+                    {clinic.name} ({clinic.code})
+                  </MenuItem>
+                ))}
+              </TextField>
             </Grid>
           </Grid>
         </Stack>
@@ -234,7 +253,12 @@ export function DoctorFormDialog({
         <Button type="button" onClick={onClose} disabled={loading}>
           Vazgec
         </Button>
-        <Button type="button" variant="contained" onClick={handleSubmit} disabled={loading}>
+        <Button
+          type="button"
+          variant="contained"
+          onClick={handleSubmit}
+          disabled={loading || referenceDataLoading || Boolean(referenceDataError)}
+        >
           {mode === 'create' ? 'Kaydi Olustur' : 'Degisiklikleri Kaydet'}
         </Button>
       </DialogActions>

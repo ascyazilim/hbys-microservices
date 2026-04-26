@@ -67,7 +67,8 @@ export function DoctorDetailCard({ doctor }: DoctorDetailCardProps) {
                 <div>
                   <Typography variant="h5">Kimlik ve Gorev Bilgileri</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    DoctorResponse icindeki temel doktor alanlari.
+                    Doktorun sistem tarafindan uretilecek kurumsal personel numarasi ve referans
+                    veri iliskileri.
                   </Typography>
                 </div>
                 <Chip label={getStatusLabel(doctor.status)} color="primary" variant="outlined" />
@@ -85,13 +86,13 @@ export function DoctorDetailCard({ doctor }: DoctorDetailCardProps) {
               />
               <DetailRow
                 icon={MedicalServicesRounded}
-                label="Uzmanlik Kodu"
-                value={doctor.specialtyCode}
+                label="Uzmanlik"
+                value={`${doctor.specialtyName} (${doctor.specialtyCode})`}
               />
               <DetailRow
                 icon={LocalHospitalRounded}
-                label="Klinik ID"
-                value={doctor.clinicId === null ? 'Belirtilmedi' : String(doctor.clinicId)}
+                label="Klinik"
+                value={doctor.clinicName}
               />
             </Stack>
           </CardContent>
@@ -104,8 +105,8 @@ export function DoctorDetailCard({ doctor }: DoctorDetailCardProps) {
             <Stack spacing={2}>
               <Typography variant="h5">Iletisim ve Servis Notlari</Typography>
               <Typography variant="body2" color="text.secondary">
-                Doctor detail endpointi backend tarafinda Redis cache destekli calisir. Ekran,
-                yalnizca servisin gercek response alanlarini gosterir.
+                Uzmanlik ve klinik verileri su an doctor-service icinde referans veri olarak
+                tutulur; ileride ayri bir reference-data-service katmanina tasinabilir.
               </Typography>
               <DetailRow
                 icon={MailOutlineRounded}

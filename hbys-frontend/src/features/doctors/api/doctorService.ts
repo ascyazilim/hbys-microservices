@@ -6,6 +6,7 @@ import type {
   Doctor,
   DoctorStatus,
   PageResponse,
+  ReferenceOption,
   UpdateDoctorRequest,
 } from '../types/doctor.types.ts'
 
@@ -33,6 +34,10 @@ function extractErrorMessage(data: unknown) {
 
   if (data && typeof data === 'object') {
     const record = data as Record<string, unknown>
+
+    if (typeof record.detail === 'string' && record.detail.trim()) {
+      return record.detail
+    }
 
     if (typeof record.message === 'string' && record.message.trim()) {
       return record.message
@@ -115,15 +120,27 @@ function normalizeDoctor(value: unknown): Doctor | null {
   const personelNo = typeof record.personelNo === 'string' ? record.personelNo : ''
   const firstName = typeof record.firstName === 'string' ? record.firstName : ''
   const lastName = typeof record.lastName === 'string' ? record.lastName : ''
-  const specialtyCode =
-    typeof record.specialtyCode === 'string' ? record.specialtyCode : ''
+  const specialtyId =
+    typeof record.specialtyId === 'number' && Number.isFinite(record.specialtyId)
+      ? record.specialtyId
+      : NaN
+  const specialtyCode = typeof record.specialtyCode === 'string' ? record.specialtyCode : ''
+  const specialtyName = typeof record.specialtyName === 'string' ? record.specialtyName : ''
   const clinicId =
-    typeof record.clinicId === 'number' && Number.isFinite(record.clinicId)
-      ? record.clinicId
-      : null
+    typeof record.clinicId === 'number' && Number.isFinite(record.clinicId) ? record.clinicId : NaN
+  const clinicName = typeof record.clinicName === 'string' ? record.clinicName : ''
   const status = isDoctorStatus(record.status) ? record.status : 'ACTIVE'
 
-  if (!id || !personelNo || !firstName || !lastName || !specialtyCode) {
+  if (
+    !id ||
+    !personelNo ||
+    !firstName ||
+    !lastName ||
+    !Number.isFinite(specialtyId) ||
+    !specialtyName ||
+    !Number.isFinite(clinicId) ||
+    !clinicName
+  ) {
     return null
   }
 
@@ -134,8 +151,11 @@ function normalizeDoctor(value: unknown): Doctor | null {
     lastName,
     email: typeof record.email === 'string' ? record.email : null,
     phone: typeof record.phone === 'string' ? record.phone : null,
+    specialtyId,
     specialtyCode,
+    specialtyName,
     clinicId,
+    clinicName,
     status,
   }
 }
@@ -169,6 +189,31 @@ function normalizeDoctorPage(data: UnknownPageResponse | undefined): PageRespons
   }
 }
 
+function normalizeReferenceOption(value: unknown): ReferenceOption | null {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const record = value as Record<string, unknown>
+  const id = typeof record.id === 'number' && Number.isFinite(record.id) ? record.id : NaN
+  const code = typeof record.code === 'string' ? record.code : ''
+  const name = typeof record.name === 'string' ? record.name : ''
+
+  if (!Number.isFinite(id) || !code || !name) {
+    return null
+  }
+
+  return { id, code, name }
+}
+
+function normalizeReferenceList(data: unknown): ReferenceOption[] {
+  return Array.isArray(data)
+    ? data
+        .map((item) => normalizeReferenceOption(item))
+        .filter((item): item is ReferenceOption => item !== null)
+    : []
+}
+
 function buildClientSearchResults(term: string, sourceDoctors: Doctor[]) {
   const normalizedTerm = term.trim().toLocaleLowerCase('tr-TR')
 
@@ -187,7 +232,9 @@ function buildClientSearchResults(term: string, sourceDoctors: Doctor[]) {
       (doctor.email ?? '').toLocaleLowerCase('tr-TR').includes(normalizedTerm) ||
       (doctor.phone ?? '').toLocaleLowerCase('tr-TR').includes(normalizedTerm) ||
       doctor.specialtyCode.toLocaleLowerCase('tr-TR').includes(normalizedTerm) ||
-      String(doctor.clinicId ?? '').includes(normalizedTerm) ||
+      doctor.specialtyName.toLocaleLowerCase('tr-TR').includes(normalizedTerm) ||
+      doctor.clinicName.toLocaleLowerCase('tr-TR').includes(normalizedTerm) ||
+      String(doctor.clinicId).includes(normalizedTerm) ||
       doctor.status.toLocaleLowerCase('tr-TR').includes(normalizedTerm)
     )
   })
@@ -207,12 +254,11 @@ async function fetchDoctorsPage(params: DoctorListParams = {}) {
 
 function normalizeCreatePayload(payload: CreateDoctorRequest): CreateDoctorRequest {
   return {
-    personelNo: payload.personelNo.trim(),
     firstName: payload.firstName.trim(),
     lastName: payload.lastName.trim(),
     email: normalizeOptionalString(payload.email),
     phone: normalizeOptionalString(payload.phone),
-    specialtyCode: payload.specialtyCode.trim(),
+    specialtyId: payload.specialtyId,
     clinicId: payload.clinicId,
   }
 }
@@ -223,7 +269,7 @@ function normalizeUpdatePayload(payload: UpdateDoctorRequest): UpdateDoctorReque
     lastName: payload.lastName.trim(),
     email: normalizeOptionalString(payload.email),
     phone: normalizeOptionalString(payload.phone),
-    specialtyCode: normalizeOptionalString(payload.specialtyCode),
+    specialtyId: payload.specialtyId,
     clinicId: payload.clinicId,
   }
 }
@@ -242,6 +288,16 @@ export const doctorService = {
     }
 
     return doctor
+  },
+
+  async getSpecialties() {
+    const response = await apiClient.get<ReferenceOption[]>('/api/doctors/specialties')
+    return normalizeReferenceList(response.data)
+  },
+
+  async getClinics() {
+    const response = await apiClient.get<ReferenceOption[]>('/api/doctors/clinics')
+    return normalizeReferenceList(response.data)
   },
 
   async searchDoctors(term: string) {
@@ -280,10 +336,7 @@ export const doctorService = {
   },
 
   async createDoctor(payload: CreateDoctorRequest) {
-    const response = await apiClient.post<Doctor>(
-      '/api/doctors',
-      normalizeCreatePayload(payload),
-    )
+    const response = await apiClient.post<Doctor>('/api/doctors', normalizeCreatePayload(payload))
     const doctor = normalizeDoctor(response.data)
 
     if (!doctor) {
@@ -294,10 +347,7 @@ export const doctorService = {
   },
 
   async updateDoctor(id: string, payload: UpdateDoctorRequest) {
-    const response = await apiClient.put<Doctor>(
-      `/api/doctors/${id}`,
-      normalizeUpdatePayload(payload),
-    )
+    const response = await apiClient.put<Doctor>(`/api/doctors/${id}`, normalizeUpdatePayload(payload))
     const doctor = normalizeDoctor(response.data)
 
     if (!doctor) {

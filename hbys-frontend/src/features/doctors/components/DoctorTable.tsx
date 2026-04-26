@@ -105,7 +105,10 @@ export function DoctorTable({
                     sx={{ alignSelf: 'flex-start' }}
                   />
                   <Typography variant="body2" color="text.secondary">
-                    Uzmanlik: {doctor.specialtyCode}
+                    Uzmanlik: {doctor.specialtyName}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Klinik: {doctor.clinicName}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Telefon: {doctor.phone || 'Belirtilmedi'}
@@ -174,7 +177,7 @@ export function DoctorTable({
               <TableCell>Doktor</TableCell>
               <TableCell>Personel No</TableCell>
               <TableCell>Uzmanlik</TableCell>
-              <TableCell>Klinik ID</TableCell>
+              <TableCell>Klinik</TableCell>
               <TableCell>Iletisim</TableCell>
               <TableCell>Durum</TableCell>
               <TableCell align="right">Aksiyonlar</TableCell>
@@ -192,8 +195,13 @@ export function DoctorTable({
                   </Typography>
                 </TableCell>
                 <TableCell>{doctor.personelNo}</TableCell>
-                <TableCell>{doctor.specialtyCode}</TableCell>
-                <TableCell>{doctor.clinicId ?? 'Belirtilmedi'}</TableCell>
+                <TableCell>
+                  <Typography variant="body2">{doctor.specialtyName}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {doctor.specialtyCode}
+                  </Typography>
+                </TableCell>
+                <TableCell>{doctor.clinicName}</TableCell>
                 <TableCell>{doctor.phone || 'Belirtilmedi'}</TableCell>
                 <TableCell>
                   <Chip

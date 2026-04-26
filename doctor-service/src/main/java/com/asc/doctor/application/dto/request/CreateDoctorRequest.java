@@ -5,24 +5,21 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 public record CreateDoctorRequest(
-        @NotBlank(message = "Personel numarası boş olamaz")
-        String personelNo,
-
-        @NotBlank(message = "İsim alanı boş olamaz")
+        @NotBlank(message = "Isim alani bos olamaz")
         String firstName,
 
-        @NotBlank(message = "Soyisim alanı boş olamaz")
+        @NotBlank(message = "Soyisim alani bos olamaz")
         String lastName,
 
-        @Email(message = "Geçerli bir e-posta adresi giriniz")
+        @Email(message = "Gecerli bir e-posta adresi giriniz")
         String email,
 
         String phone,
 
-        @NotBlank(message = "Uzmanlık kodu boş olamaz")
-        String specialtyCode,
+        @NotNull(message = "Uzmanlik secimi zorunludur")
+        Long specialtyId,
 
-        @NotNull(message = "Klinik ID boş olamaz")
+        @NotNull(message = "Klinik secimi zorunludur")
         Long clinicId
 ) {
 }

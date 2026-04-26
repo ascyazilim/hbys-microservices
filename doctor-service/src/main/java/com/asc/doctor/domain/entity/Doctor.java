@@ -2,7 +2,11 @@ package com.asc.doctor.domain.entity;
 
 import com.asc.doctor.domain.enums.DoctorStatus;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
@@ -39,21 +43,25 @@ public class Doctor {
     private String phone;
 
     @Column(name = "specialty_code", nullable = false)
-    private String specialtyCode; // Örn: KARD, DAHL
+    private String specialtyCode;
 
-    @Column(name = "clinic_id")
-    private Long clinicId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "specialty_id", nullable = false)
+    private Specialty specialty;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "clinic_id", nullable = false)
+    private Clinic clinic;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DoctorStatus status;
 
-    // Eşzamanlılık (Concurrency) kontrolü için Optimistic Locking
     @Version
     private Long version;
 
-    // Soft Delete (Yumuşak Silme) için bayrak
     @Column(name = "is_deleted")
+    @Builder.Default
     private boolean isDeleted = false;
 
     @Column(name = "created_at", updatable = false)
@@ -62,13 +70,12 @@ public class Doctor {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Domain iş kuralları (Entity içindeki davranışlar)
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
         if (this.status == null) {
-            this.status = DoctorStatus.ACTIVE; // Varsayılan olarak aktif başlar
+            this.status = DoctorStatus.ACTIVE;
         }
     }
 
@@ -77,7 +84,6 @@ public class Doctor {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // İş kuralları metodları ("Aggregate Root" mantığı)
     public void deactivate() {
         this.status = DoctorStatus.PASSIVE;
     }
